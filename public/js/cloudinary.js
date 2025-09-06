@@ -1,5 +1,5 @@
 // js/cloudinary.js
-const BASE_URL = "https://YOUR-HOSTED-BACKEND-URL"; // <-- replace with deployed server URL
+const BASE_URL = "https://farm-leasing-app.onrender.com"; // <-- your deployed backend URL
 
 // Upload via backend
 async function uploadToCloudinary(file) {
@@ -38,7 +38,9 @@ async function uploadToCloudinary(file) {
 // Delete via backend
 async function deleteFromCloudinary(publicId) {
   try {
-    const response = await fetch("https://your-backend-url/delete-cloudinary", {
+    console.log("🗑 Deleting file with publicId:", publicId);
+
+    const response = await fetch(`${BASE_URL}/delete-cloudinary`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ publicId })
