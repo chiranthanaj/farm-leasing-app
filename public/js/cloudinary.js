@@ -2,9 +2,6 @@ const CLOUDINARY_URL = "https://api.cloudinary.com/v1_1/dp5br2uug/auto/upload";
 const CLOUDINARY_UPLOAD_PRESET = "unsigned_preset";
 const BACKEND_URL = "http://localhost:3000";
 
-/**
- * Uploads a file (image or document) to Cloudinary.
- */
 export async function uploadToCloudinary(file) {
   const formData = new FormData();
   formData.append("file", file);
@@ -17,6 +14,7 @@ export async function uploadToCloudinary(file) {
     });
 
     if (!res.ok) throw new Error("Cloudinary upload failed");
+
     const data = await res.json();
     return { secure_url: data.secure_url, public_id: data.public_id };
   } catch (err) {
@@ -25,19 +23,15 @@ export async function uploadToCloudinary(file) {
   }
 }
 
-/**
- * Deletes a file from Cloudinary using backend.
- */
 export async function deleteFromCloudinary(publicId) {
   try {
-    const res = await fetch(`${BACKEND_URL}/delete-cloudinary`, {
+    const res = await fetch(`${BACKEND_URL}/delete-cloudinary/${publicId}`, {
       method: "DELETE",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ publicId }),
     });
 
     const data = await res.json();
     if (!res.ok || !data.success) throw new Error("Delete failed: " + JSON.stringify(data));
+
     return true;
   } catch (err) {
     console.error("❌ Delete error:", err);
