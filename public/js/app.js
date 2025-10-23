@@ -97,16 +97,12 @@ document.addEventListener("DOMContentLoaded", () => {
 
     const landImages = document.getElementById("land-images").files;
 
-    if (landImages.length === 0) {
-      alert("Please select at least one image to upload.");
-      return;
-    }
-
-    console.log("Preparing to upload images...", landImages);
+    console.log("Preparing to upload images...");
+    console.log("Images:", landImages);
 
     try {
       const formData = new FormData();
-      Array.from(landImages).forEach(file => formData.append("images", file));
+      Array.from(landImages).forEach(file => formData.append("files", file));
 
       const res = await fetch("http://localhost:5000/upload-cloudinary", {
         method: "POST",
@@ -131,6 +127,7 @@ document.addEventListener("DOMContentLoaded", () => {
         contactInfo,
         imageUrls: uploadResults.map(r => r.secure_url),
         imagePublicIds: uploadResults.map(r => r.public_id),
+        imageResourceTypes: uploadResults.map(r => r.resource_type || "image"),
         createdAt: firebase.firestore.FieldValue.serverTimestamp()
       });
 
