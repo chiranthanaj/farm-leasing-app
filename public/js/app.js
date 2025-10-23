@@ -1,6 +1,8 @@
 import { uploadToCloudinary, deleteFromCloudinary } from "./cloudinary.js";
 
 document.addEventListener("DOMContentLoaded", () => {
+
+  // -------------------- Utility --------------------
   function showScreen(id) {
     document.querySelectorAll("section").forEach(sec => sec.classList.add("hidden"));
     const screen = document.getElementById(id);
@@ -10,7 +12,7 @@ document.addEventListener("DOMContentLoaded", () => {
   showScreen("welcome-screen");
   let isLogin = true;
 
-  // --- Welcome buttons ---
+  // -------------------- Welcome buttons --------------------
   document.getElementById("btn-login").addEventListener("click", () => {
     showScreen("auth-screen");
     document.getElementById("auth-title").textContent = "Login";
@@ -27,7 +29,7 @@ document.addEventListener("DOMContentLoaded", () => {
     showScreen("welcome-screen");
   });
 
-  // --- Toggle login/register ---
+  // -------------------- Toggle login/register --------------------
   document.getElementById("auth-toggle-btn").addEventListener("click", () => {
     isLogin = !isLogin;
     document.getElementById("auth-title").textContent = isLogin ? "Login" : "Register";
@@ -39,7 +41,7 @@ document.addEventListener("DOMContentLoaded", () => {
       : "Login here";
   });
 
-  // --- Firebase auth ---
+  // -------------------- Firebase auth --------------------
   document.getElementById("auth-form").addEventListener("submit", async (e) => {
     e.preventDefault();
     const email = document.getElementById("email").value;
@@ -57,7 +59,7 @@ document.addEventListener("DOMContentLoaded", () => {
     }
   });
 
-  // --- Role selection ---
+  // -------------------- Role selection --------------------
   document.getElementById("role-seller").addEventListener("click", async () => {
     showScreen("seller-screen");
     loadSellerUploads();
@@ -68,7 +70,7 @@ document.addEventListener("DOMContentLoaded", () => {
     showScreen("welcome-screen");
   });
 
-  // --- Logout ---
+  // -------------------- Logout --------------------
   document.getElementById("seller-logout-btn").addEventListener("click", () => {
     auth.signOut();
     showScreen("welcome-screen");
@@ -81,7 +83,7 @@ document.addEventListener("DOMContentLoaded", () => {
     showScreen("buyer-screen");
   });
 
-  // --- Seller Upload ---
+  // -------------------- Seller Upload --------------------
   document.getElementById("land-upload-form").addEventListener("submit", async (e) => {
     e.preventDefault();
 
@@ -100,14 +102,10 @@ document.addEventListener("DOMContentLoaded", () => {
       const imageUploadPromises = Array.from(landImages).map(file => uploadToCloudinary(file));
       const docUploadPromises = Array.from(landDocs).map(file => uploadToCloudinary(file));
 
-      const allUploadPromises = [...imageUploadPromises, ...docUploadPromises];
-      const uploadResults = await Promise.all(allUploadPromises);
+      const allUploadResults = await Promise.all([...imageUploadPromises, ...docUploadPromises]);
 
-      const imageUrls = uploadResults.slice(0, landImages.length).map(result => result.secure_url);
-      const imagePublicIds = uploadResults.slice(0, landImages.length).map(result => result.public_id);
-
-      const docUrls = uploadResults.slice(landImages.length).map(result => result.secure_url);
-      const docPublicIds = uploadResults.slice(landImages.length).map(result => result.public_id);
+      const imageResults = allUploadResults.slice(0, landImages.length);
+      const docResults = allUploadResults.slice(landImages.length);
 
       await db.collection("lands").add({
         location,
@@ -117,10 +115,12 @@ document.addEventListener("DOMContentLoaded", () => {
         usageSuitability,
         pastUsage,
         contactInfo,
-        imageUrls,
-        docUrls,
-        imagePublicIds,
-        docPublicIds,
+        imageUrls: imageResults.map(r => r.secure_url),
+        imagePublicIds: imageResults.map(r => r.public_id),
+        imageResourceTypes: imageResults.map(r => r.resource_type || "image"),
+        docUrls: docResults.map(r => r.secure_url),
+        docPublicIds: docResults.map(r => r.public_id),
+        docResourceTypes: docResults.map(r => r.resource_type || "raw"),
         createdAt: firebase.firestore.FieldValue.serverTimestamp()
       });
 
@@ -133,14 +133,12 @@ document.addEventListener("DOMContentLoaded", () => {
     }
   });
 
-  // --- Load seller's previous uploads ---
+  // -------------------- Load seller uploads --------------------
   async function loadSellerUploads() {
     const uploadsDiv = document.getElementById("seller-previous-uploads");
     uploadsDiv.innerHTML = "";
 
-    const querySnapshot = await db.collection("lands")
-      .orderBy("createdAt", "desc")
-      .get();
+    const querySnapshot = await db.collection("lands").orderBy("createdAt", "desc").get();
 
     querySnapshot.forEach((doc) => {
       const land = doc.data();
@@ -155,12 +153,18 @@ document.addEventListener("DOMContentLoaded", () => {
           <p>Suitable for: ${land.usageSuitability}</p>
           <p>Past Usage: ${land.pastUsage}</p>
           <p>Contact: ${land.contactInfo}</p>
+          <div class="mt-2">
+            <h4 class="font-semibold">Documents:</h4>
+            <ul class="list-disc ml-6">
+              ${(land.docUrls || []).map(url => `<li><a href="${url}" target="_blank" class="text-blue-600 underline">View Document</a></li>`).join("")}
+            </ul>
+          </div>
           <button class="bg-red-600 text-white px-3 py-1 rounded mt-2 delete-btn" data-id="${docId}">DELETE</button>
         </div>
       `;
     });
 
-    // --- DELETE FEATURE ---
+    // -------------------- Delete button --------------------
     document.querySelectorAll(".delete-btn").forEach(btn => {
       btn.addEventListener("click", async () => {
         const id = btn.dataset.id;
@@ -173,18 +177,24 @@ document.addEventListener("DOMContentLoaded", () => {
 
           const land = docSnap.data();
 
-          const imageDeletePromises = (land.imagePublicIds || []).map(publicId =>
-            deleteFromCloudinary(publicId).catch(err => console.error(`Failed to delete image: ${err}`))
+          const imageDeletePromises = (land.imagePublicIds || []).map((publicId, i) =>
+            deleteFromCloudinary(publicId, land.imageResourceTypes[i] || "image").catch(err => {
+              console.error(`Failed to delete image ${publicId}:`, err);
+              return null;
+            })
           );
 
-          const docDeletePromises = (land.docPublicIds || []).map(publicId =>
-            deleteFromCloudinary(publicId).catch(err => console.error(`Failed to delete doc: ${err}`))
+          const docDeletePromises = (land.docPublicIds || []).map((publicId, i) =>
+            deleteFromCloudinary(publicId, land.docResourceTypes[i] || "raw").catch(err => {
+              console.error(`Failed to delete document ${publicId}:`, err);
+              return null;
+            })
           );
 
           await Promise.all([...imageDeletePromises, ...docDeletePromises]);
           await docRef.delete();
-          btn.closest("div").remove();
 
+          btn.closest("div").remove();
           alert("✅ Land deleted successfully!");
         } catch (err) {
           console.error("❌ Delete failed:", err);
@@ -194,7 +204,7 @@ document.addEventListener("DOMContentLoaded", () => {
     });
   }
 
-  // --- Buyer search ---
+  // -------------------- Buyer search --------------------
   document.getElementById("search-form").addEventListener("submit", async (e) => {
     e.preventDefault();
 
@@ -218,22 +228,18 @@ document.addEventListener("DOMContentLoaded", () => {
         land.price >= priceMin &&
         land.price <= priceMax
       ) {
-        let imagesHTML = "";
-        if (land.imageUrls && land.imageUrls.length > 0) {
-          imagesHTML = land.imageUrls.map(url => `<img src="${url}" class="w-full h-40 object-cover rounded mb-2" alt="Land Image"/>`).join("");
-        }
+        const imagesHTML = (land.imageUrls || [])
+          .map(url => `<img src="${url}" class="w-full h-40 object-cover rounded mb-2" alt="Land Image"/>`)
+          .join("");
 
-        let docsHTML = "";
-        if (land.docUrls && land.docUrls.length > 0) {
-          docsHTML = `
-            <div class="mt-2">
-              <h4 class="font-semibold">Documents:</h4>
-              <ul class="list-disc ml-6">
-                ${land.docUrls.map(url => `<li><a href="${url}" target="_blank" class="text-blue-600 underline">View Document</a></li>`).join("")}
-              </ul>
-            </div>
-          `;
-        }
+        const docsHTML = (land.docUrls || []).length > 0
+          ? `<div class="mt-2">
+               <h4 class="font-semibold">Documents:</h4>
+               <ul class="list-disc ml-6">
+                 ${(land.docUrls || []).map(url => `<li><a href="${url}" target="_blank" class="text-blue-600 underline">View Document</a></li>`).join("")}
+               </ul>
+             </div>`
+          : "";
 
         resultsDiv.innerHTML += `
           <div class="p-4 bg-white border rounded shadow-lg text-left">
@@ -256,4 +262,5 @@ document.addEventListener("DOMContentLoaded", () => {
 
     showScreen("buyer-results-screen");
   });
+
 });
