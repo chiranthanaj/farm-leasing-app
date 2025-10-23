@@ -1,9 +1,8 @@
-// frontend Cloudinary helper
-const BACKEND_URL = "https://farm-leasing-app.onrender.com";
+// backend URL (where server.js is running)
+const BACKEND_URL = "http://localhost:5000"; // replace with deployed Render URL in production
 
 /**
- * Uploads a file to the backend Cloudinary endpoint
- * Returns { secure_url, public_id, resource_type }
+ * Uploads a file (image or document) to Cloudinary via backend
  */
 export async function uploadToCloudinary(file) {
   const formData = new FormData();
@@ -15,16 +14,12 @@ export async function uploadToCloudinary(file) {
       body: formData,
     });
 
-    if (!res.ok) {
-      const data = await res.json().catch(() => ({}));
-      throw new Error("Upload failed: " + JSON.stringify(data));
-    }
-
     const data = await res.json();
+    if (!res.ok) throw new Error(data.error || "Upload failed");
+
     return {
       secure_url: data.secure_url,
       public_id: data.public_id,
-      resource_type: data.resource_type,
     };
   } catch (err) {
     console.error("❌ Upload error:", err);
@@ -34,18 +29,15 @@ export async function uploadToCloudinary(file) {
 
 /**
  * Deletes a file from Cloudinary via backend
- * @param {string} publicId
- * @param {string} resourceType
  */
-export async function deleteFromCloudinary(publicId, resourceType = "auto") {
+export async function deleteFromCloudinary(publicId) {
   try {
-    const res = await fetch(
-      `${BACKEND_URL}/delete-cloudinary/${publicId}?resource_type=${resourceType}`,
-      { method: "DELETE" }
-    );
+    const res = await fetch(`${BACKEND_URL}/delete-cloudinary/${publicId}`, {
+      method: "DELETE",
+    });
 
     const data = await res.json();
-    if (!res.ok || !data.success) throw new Error("Delete failed: " + JSON.stringify(data));
+    if (!res.ok || !data.success) throw new Error("Delete failed");
 
     return true;
   } catch (err) {
