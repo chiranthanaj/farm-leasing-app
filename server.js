@@ -4,7 +4,7 @@ import multer from "multer";
 import { v2 as cloudinary } from "cloudinary";
 
 const app = express();
-const upload = multer({ dest: "uploads/" });
+const upload = multer({ dest: "uploads/" }); // temporary file storage
 
 app.use(cors());
 app.use(express.json({ limit: "50mb" }));
@@ -21,9 +21,10 @@ cloudinary.config({
 app.post("/upload-cloudinary", upload.single("file"), async (req, res) => {
   try {
     const filePath = req.file.path;
+
     const result = await cloudinary.uploader.upload(filePath, {
       folder: "farm_app",
-      resource_type: "auto"
+      resource_type: "auto" // important for non-image files
     });
 
     res.json({

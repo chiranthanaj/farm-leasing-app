@@ -1,11 +1,10 @@
 const CLOUDINARY_URL = "https://api.cloudinary.com/v1_1/dp5br2uug/auto/upload";
 const CLOUDINARY_UPLOAD_PRESET = "unsigned_preset";
-const BACKEND_URL = "http://localhost:3000";
+const BACKEND_URL = "http://localhost:5000"; // make sure port matches server.js
 
 /**
- * Uploads a file (any type: image, pdf, csv, docx, etc.) to Cloudinary.
- * Automatically detects resource type.
- * Returns secure_url, public_id, and resource_type.
+ * Uploads a file (any type) to Cloudinary.
+ * Returns secure_url, public_id, resource_type.
  */
 export async function uploadToCloudinary(file) {
   const formData = new FormData();
@@ -25,7 +24,7 @@ export async function uploadToCloudinary(file) {
     return {
       secure_url: data.secure_url,
       public_id: data.public_id,
-      resource_type: data.resource_type, // important for delete
+      resource_type: data.resource_type, // important for deletion
     };
   } catch (err) {
     console.error("❌ Cloudinary upload error:", err);
