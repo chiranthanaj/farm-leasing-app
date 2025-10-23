@@ -1,4 +1,3 @@
-// js/firebaseConfig.js
 const firebaseConfig = {
   apiKey: "AIzaSyA1girtWjcJqXcykKj_20MdL8JQnlIccqE",
   authDomain: "farm-leasing-app.firebaseapp.com",

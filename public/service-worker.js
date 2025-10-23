@@ -1,4 +1,3 @@
-// service-worker.js
 self.addEventListener("install", (e) => {
   e.waitUntil(
     caches.open("farm-app-cache").then((cache) => {
@@ -20,6 +19,9 @@ self.addEventListener("fetch", (e) => {
   e.respondWith(
     caches.match(e.request).then((response) => {
       return response || fetch(e.request);
+    }).catch(() => {
+      // Optional fallback for offline
+      if (e.request.destination === "document") return caches.match("/index.html");
     })
   );
 });

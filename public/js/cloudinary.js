@@ -1,59 +1,55 @@
-// js/cloudinary.js
-const BASE_URL = "https://farm-leasing-app.onrender.com"; // <-- your deployed backend URL
+const CLOUDINARY_URL = "https://api.cloudinary.com/v1_1/dp5br2uug/auto/upload";
+const CLOUDINARY_UPLOAD_PRESET = "unsigned_preset";
+const BACKEND_URL = "http://localhost:3000";
 
-// Upload via backend
-async function uploadToCloudinary(file) {
+/**
+ * Uploads a file (any type: image, pdf, csv, docx, etc.) to Cloudinary.
+ * Automatically detects resource type.
+ * Returns secure_url, public_id, and resource_type.
+ */
+export async function uploadToCloudinary(file) {
+  const formData = new FormData();
+  formData.append("file", file);
+  formData.append("upload_preset", CLOUDINARY_UPLOAD_PRESET);
+
   try {
-    console.log("📤 Uploading file to backend Cloudinary endpoint...");
-
-    // Convert file to Base64
-    const reader = new FileReader();
-    const base64Promise = new Promise((resolve, reject) => {
-      reader.onloadend = () => resolve(reader.result);
-      reader.onerror = reject;
-    });
-    reader.readAsDataURL(file);
-    const fileBase64 = await base64Promise;
-
-    const response = await fetch(`${BASE_URL}/upload-cloudinary`, {
+    const res = await fetch(CLOUDINARY_URL, {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ file: fileBase64 })
+      body: formData,
     });
 
-    if (!response.ok) {
-      const text = await response.text();
-      throw new Error(`Upload failed: ${text}`);
-    }
+    if (!res.ok) throw new Error("Cloudinary upload failed");
 
-    const data = await response.json();
-    console.log("📦 Upload response:", data);
-    return data;
+    const data = await res.json();
+
+    return {
+      secure_url: data.secure_url,
+      public_id: data.public_id,
+      resource_type: data.resource_type, // important for delete
+    };
   } catch (err) {
-    console.error("❌ Upload error:", err);
+    console.error("❌ Cloudinary upload error:", err);
     throw err;
   }
 }
 
-// Delete via backend
-async function deleteFromCloudinary(publicId) {
+/**
+ * Deletes a file from Cloudinary using the backend.
+ * publicId: Cloudinary public_id
+ * resourceType: image, raw, video, etc.
+ */
+export async function deleteFromCloudinary(publicId, resourceType = "auto") {
   try {
-    console.log("🗑 Deleting file with publicId:", publicId);
-
-    const response = await fetch(`${BASE_URL}/delete-cloudinary`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ publicId })
+    const res = await fetch(`${BACKEND_URL}/delete-cloudinary/${publicId}?resource_type=${resourceType}`, {
+      method: "DELETE",
     });
 
-    if (!response.ok) {
-      const text = await response.text();
-      throw new Error(`Delete failed: ${text}`);
+    const data = await res.json();
+    if (!res.ok || !data.success) {
+      throw new Error("Delete failed: " + JSON.stringify(data));
     }
 
-    const data = await response.json();
-    console.log("🗑 Delete response:", data);
-    return data;
+    return true;
   } catch (err) {
     console.error("❌ Delete error:", err);
     throw err;
