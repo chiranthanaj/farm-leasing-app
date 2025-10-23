@@ -1,20 +1,25 @@
 // Frontend Cloudinary helper
 const BACKEND_URL = "https://farm-leasing-app.onrender.com"; // Render live backend
-const CLOUDINARY_URL = "https://api.cloudinary.com/v1_1/dp5br2uug/auto/upload";
-const CLOUDINARY_UPLOAD_PRESET = "unsigned_preset";
 
 /**
- * Uploads any file (image, PDF, CSV, Word, etc.) to Cloudinary.
+ * Uploads any file (image, PDF, CSV, Word, etc.) to the backend Cloudinary endpoint.
  * Returns { secure_url, public_id, resource_type }
  */
 export async function uploadToCloudinary(file) {
   const formData = new FormData();
   formData.append("file", file);
-  formData.append("upload_preset", CLOUDINARY_UPLOAD_PRESET);
 
   try {
-    const res = await fetch(CLOUDINARY_URL, { method: "POST", body: formData });
-    if (!res.ok) throw new Error("Cloudinary upload failed");
+    console.log("📤 Uploading file to backend...");
+    const res = await fetch(`${BACKEND_URL}/upload-cloudinary`, {
+      method: "POST",
+      body: formData,
+    });
+
+    if (!res.ok) {
+      const text = await res.text();
+      throw new Error("Upload failed: " + text);
+    }
 
     const data = await res.json();
     return {

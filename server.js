@@ -2,6 +2,7 @@ import express from "express";
 import cors from "cors";
 import multer from "multer";
 import { v2 as cloudinary } from "cloudinary";
+import fs from "fs";
 
 const app = express();
 const upload = multer({ dest: "uploads/" }); // temporary local storage
@@ -20,11 +21,15 @@ cloudinary.config({
 // --- Upload route ---
 app.post("/upload-cloudinary", upload.single("file"), async (req, res) => {
   try {
-    const filePath = req.file.path;
-    const result = await cloudinary.uploader.upload(filePath, {
+    if (!req.file) return res.status(400).json({ error: "No file uploaded" });
+
+    const result = await cloudinary.uploader.upload(req.file.path, {
       folder: "farm_app",
       resource_type: "auto", // supports images, PDFs, docs, etc.
     });
+
+    // Remove local file after upload
+    fs.unlink(req.file.path, () => {});
 
     res.json({
       secure_url: result.secure_url,
@@ -33,7 +38,7 @@ app.post("/upload-cloudinary", upload.single("file"), async (req, res) => {
     });
   } catch (err) {
     console.error("❌ Upload error:", err);
-    res.status(500).json({ error: "Failed to upload file" });
+    res.status(500).json({ error: "Failed to upload file", details: err.message });
   }
 });
 
