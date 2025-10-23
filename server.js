@@ -5,7 +5,7 @@ import fs from "fs";
 import { v2 as cloudinary } from "cloudinary";
 
 const app = express();
-const upload = multer({ dest: "uploads/" });
+const upload = multer({ dest: "uploads/" }); // temp storage
 
 app.use(cors());
 app.use(express.json({ limit: "50mb" }));
@@ -14,28 +14,28 @@ app.use(express.urlencoded({ extended: true, limit: "50mb" }));
 // --- Cloudinary config ---
 cloudinary.config({
   cloud_name: "dp5br2uug",
-  api_key: "358437331856298",     
+  api_key: "358437331856298",
   api_secret: "SQHZloOPtUq-3IBsBoSvXcXjOTY"
 });
 
 // --- Upload route for multiple files ---
 app.post("/upload-cloudinary", upload.array("files"), async (req, res) => {
-  if (!req.files || req.files.length === 0)
-    return res.status(400).json({ error: "No file uploaded" });
-
   try {
+    if (!req.files || req.files.length === 0)
+      return res.status(400).json({ error: "No file uploaded" });
+
     const uploadResults = [];
 
     for (const file of req.files) {
       const result = await cloudinary.uploader.upload(file.path, {
         folder: "farm_app",
-        resource_type: "auto",
+        resource_type: "auto"
       });
 
       uploadResults.push({
         secure_url: result.secure_url,
         public_id: result.public_id,
-        resource_type: result.resource_type,
+        resource_type: result.resource_type
       });
 
       // Delete temp file after upload
@@ -45,8 +45,8 @@ app.post("/upload-cloudinary", upload.array("files"), async (req, res) => {
     res.json(uploadResults);
   } catch (err) {
     console.error("❌ Upload error:", err);
-    // Clean up temp files if upload fails
-    req.files.forEach(f => fs.existsSync(f.path) && fs.unlinkSync(f.path));
+    // Cleanup temp files if upload fails
+    if (req.files) req.files.forEach(f => fs.existsSync(f.path) && fs.unlinkSync(f.path));
     res.status(500).json({ error: "Failed to upload file", details: err.message });
   }
 });

@@ -95,29 +95,16 @@ document.addEventListener("DOMContentLoaded", () => {
     const pastUsage = document.getElementById("past-usage").value;
     const contactInfo = document.getElementById("contact-info").value;
 
-    const landImages = document.getElementById("land-images").files;
-    const landDocs = document.getElementById("land-documents").files;
+    const landImages = Array.from(document.getElementById("land-images").files);
+    const landDocs = Array.from(document.getElementById("land-documents").files);
+    const allFiles = [...landImages, ...landDocs];
 
     try {
-      // Send all files to backend for multi-file upload
-      const formData = new FormData();
-      Array.from(landImages).forEach(file => formData.append("files", file));
-      Array.from(landDocs).forEach(file => formData.append("files", file));
+      // ✅ Use cloudinary.js function
+      const uploadResults = await uploadToCloudinary(allFiles);
 
-      const res = await fetch("http://localhost:5000/upload-cloudinary", {
-        method: "POST",
-        body: formData,
-      });
-
-      if (!res.ok) {
-        const errorText = await res.text();
-        throw new Error("Upload failed: " + errorText);
-      }
-
-      const allUploadResults = await res.json();
-
-      const imageResults = allUploadResults.slice(0, landImages.length);
-      const docResults = allUploadResults.slice(landImages.length);
+      const imageResults = uploadResults.slice(0, landImages.length);
+      const docResults = uploadResults.slice(landImages.length);
 
       await db.collection("lands").add({
         location,
@@ -136,7 +123,7 @@ document.addEventListener("DOMContentLoaded", () => {
         createdAt: firebase.firestore.FieldValue.serverTimestamp()
       });
 
-      alert("Land uploaded successfully!");
+      alert("✅ Land uploaded successfully!");
       e.target.reset();
       loadSellerUploads();
     } catch (err) {
@@ -158,7 +145,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
       uploadsDiv.innerHTML += `
         <div class="p-4 bg-white border rounded shadow-lg text-left">
-          ${land.imageUrls.map(url => `<img src="${url}" class="w-full h-40 object-cover rounded mb-2" alt="Land Image"/>`).join("")}
+          ${(land.imageUrls || []).map(url => `<img src="${url}" class="w-full h-40 object-cover rounded mb-2" alt="Land Image"/>`).join("")}
           <h3 class="font-bold text-lg">${land.location} - ${land.size} acres</h3>
           <p>Price: ₹${land.price}</p>
           <p>Soil: ${land.soilType}</p>
@@ -189,18 +176,13 @@ document.addEventListener("DOMContentLoaded", () => {
 
           const land = docSnap.data();
 
-          const imageDeletePromises = (land.imagePublicIds || []).map((publicId, i) =>
-            deleteFromCloudinary(publicId, land.imageResourceTypes[i] || "image").catch(err => {
-              console.error(`Failed to delete image ${publicId}:`, err);
-              return null;
-            })
+          // ✅ Delete images/docs via cloudinary.js
+          const imageDeletePromises = (land.imagePublicIds || []).map((pid, i) =>
+            deleteFromCloudinary(pid, land.imageResourceTypes[i] || "image").catch(() => null)
           );
 
-          const docDeletePromises = (land.docPublicIds || []).map((publicId, i) =>
-            deleteFromCloudinary(publicId, land.docResourceTypes[i] || "raw").catch(err => {
-              console.error(`Failed to delete document ${publicId}:`, err);
-              return null;
-            })
+          const docDeletePromises = (land.docPublicIds || []).map((pid, i) =>
+            deleteFromCloudinary(pid, land.docResourceTypes[i] || "raw").catch(() => null)
           );
 
           await Promise.all([...imageDeletePromises, ...docDeletePromises]);
@@ -232,7 +214,6 @@ document.addEventListener("DOMContentLoaded", () => {
 
     querySnapshot.forEach((doc) => {
       const land = doc.data();
-
       if (
         (!location || (land.location && land.location.toLowerCase().includes(location))) &&
         (!soilType || (land.soilType && land.soilType.toLowerCase().includes(soilType))) &&
@@ -240,38 +221,15 @@ document.addEventListener("DOMContentLoaded", () => {
         land.price >= priceMin &&
         land.price <= priceMax
       ) {
-        const imagesHTML = (land.imageUrls || [])
-          .map(url => `<img src="${url}" class="w-full h-40 object-cover rounded mb-2" alt="Land Image"/>`)
-          .join("");
-
+        const imagesHTML = (land.imageUrls || []).map(url => `<img src="${url}" class="w-full h-40 object-cover rounded mb-2" alt="Land Image"/>`).join("");
         const docsHTML = (land.docUrls || []).length > 0
-          ? `<div class="mt-2">
-               <h4 class="font-semibold">Documents:</h4>
-               <ul class="list-disc ml-6">
-                 ${(land.docUrls || []).map(url => `<li><a href="${url}" target="_blank" class="text-blue-600 underline">View Document</a></li>`).join("")}
-               </ul>
-             </div>`
+          ? `<div class="mt-2"><h4 class="font-semibold">Documents:</h4><ul class="list-disc ml-6">${(land.docUrls || []).map(url => `<li><a href="${url}" target="_blank" class="text-blue-600 underline">View Document</a></li>`).join("")}</ul></div>`
           : "";
-
-        resultsDiv.innerHTML += `
-          <div class="p-4 bg-white border rounded shadow-lg text-left">
-            ${imagesHTML}
-            <h3 class="font-bold text-lg">${land.location} - ${land.size} acres</h3>
-            <p>Price: ₹${land.price}</p>
-            <p>Soil: ${land.soilType}</p>
-            <p>Suitable for: ${land.usageSuitability}</p>
-            <p>Past Usage: ${land.pastUsage}</p>
-            <p>Contact: ${land.contactInfo}</p>
-            ${docsHTML}
-          </div>
-        `;
+        resultsDiv.innerHTML += `<div class="p-4 bg-white border rounded shadow-lg text-left">${imagesHTML}<h3 class="font-bold text-lg">${land.location} - ${land.size} acres</h3><p>Price: ₹${land.price}</p><p>Soil: ${land.soilType}</p><p>Suitable for: ${land.usageSuitability}</p><p>Past Usage: ${land.pastUsage}</p><p>Contact: ${land.contactInfo}</p>${docsHTML}</div>`;
       }
     });
 
-    if (resultsDiv.innerHTML === "") {
-      resultsDiv.innerHTML = `<p class="text-gray-600">No lands found for your criteria.</p>`;
-    }
-
+    if (resultsDiv.innerHTML === "") resultsDiv.innerHTML = `<p class="text-gray-600">No lands found for your criteria.</p>`;
     showScreen("buyer-results-screen");
   });
 
