@@ -1,4 +1,5 @@
-const BACKEND_URL = "http://localhost:5000"; // backend URL
+const BACKEND_URL = "https://your-backend-url.onrender.com"; // deployed backend
+
 
 /**
  * Uploads multiple files (images, docs, etc.) to backend.

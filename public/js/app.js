@@ -95,16 +95,40 @@ document.addEventListener("DOMContentLoaded", () => {
     const pastUsage = document.getElementById("past-usage").value;
     const contactInfo = document.getElementById("contact-info").value;
 
-    const landImages = Array.from(document.getElementById("land-images").files);
-    const landDocs = Array.from(document.getElementById("land-documents").files);
-    const allFiles = [...landImages, ...landDocs];
+    const landImages = document.getElementById("land-images").files;
+    const landDocs = document.getElementById("land-documents").files;
+
+    // --- Check if at least one file is selected ---
+    if (landImages.length === 0 && landDocs.length === 0) {
+      alert("Please select at least one file (image or document) to upload.");
+      return;
+    }
+
+    console.log("Preparing to upload files...");
+    console.log("Images:", landImages);
+    console.log("Documents:", landDocs);
 
     try {
-      // ✅ Use cloudinary.js function
-      const uploadResults = await uploadToCloudinary(allFiles);
+      const formData = new FormData();
+      Array.from(landImages).forEach(file => formData.append("files", file));
+      Array.from(landDocs).forEach(file => formData.append("files", file));
 
-      const imageResults = uploadResults.slice(0, landImages.length);
-      const docResults = uploadResults.slice(landImages.length);
+      const res = await fetch("http://localhost:5000/upload-cloudinary", {
+        method: "POST",
+        body: formData,
+      });
+
+      if (!res.ok) {
+        const errorText = await res.text();
+        throw new Error("Upload failed: " + errorText);
+      }
+
+      const allUploadResults = await res.json();
+
+      console.log("Upload results:", allUploadResults);
+
+      const imageResults = allUploadResults.slice(0, landImages.length);
+      const docResults = allUploadResults.slice(landImages.length);
 
       await db.collection("lands").add({
         location,
@@ -123,7 +147,7 @@ document.addEventListener("DOMContentLoaded", () => {
         createdAt: firebase.firestore.FieldValue.serverTimestamp()
       });
 
-      alert("✅ Land uploaded successfully!");
+      alert("Land uploaded successfully!");
       e.target.reset();
       loadSellerUploads();
     } catch (err) {
