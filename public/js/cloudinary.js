@@ -1,25 +1,21 @@
-// Frontend Cloudinary helper
-const BACKEND_URL = "https://farm-leasing-app.onrender.com"; // Render live backend
+const BACKEND_URL = "https://farm-leasing-app.onrender.com";
 
 /**
- * Uploads any file (image, PDF, CSV, Word, etc.) to the backend Cloudinary endpoint.
- * Returns { secure_url, public_id, resource_type }
+ * Upload a file (image/pdf/docs) via backend
  */
 export async function uploadToCloudinary(file) {
-  const formData = new FormData();
-  formData.append("file", file);
-
   try {
-    console.log("📤 Uploading file to backend...");
+    const formData = new FormData();
+    formData.append("file", file);
+
+    console.log("📤 Uploading file to backend Cloudinary endpoint...");
+
     const res = await fetch(`${BACKEND_URL}/upload-cloudinary`, {
       method: "POST",
       body: formData,
     });
 
-    if (!res.ok) {
-      const text = await res.text();
-      throw new Error("Upload failed: " + text);
-    }
+    if (!res.ok) throw new Error("Upload failed: " + await res.text());
 
     const data = await res.json();
     return {
@@ -28,18 +24,18 @@ export async function uploadToCloudinary(file) {
       resource_type: data.resource_type,
     };
   } catch (err) {
-    console.error("❌ Cloudinary upload error:", err);
+    console.error("❌ Upload error:", err);
     throw err;
   }
 }
 
 /**
- * Deletes a file from Cloudinary using the backend.
- * @param {string} publicId Cloudinary public_id
- * @param {string} resourceType image, raw, video, etc.
+ * Delete a file via backend
  */
 export async function deleteFromCloudinary(publicId, resourceType = "auto") {
   try {
+    console.log("🗑 Deleting file with publicId:", publicId);
+
     const res = await fetch(
       `${BACKEND_URL}/delete-cloudinary/${publicId}?resource_type=${resourceType}`,
       { method: "DELETE" }
