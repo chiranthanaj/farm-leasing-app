@@ -1,6 +1,7 @@
 import express from "express";
 import cors from "cors";
 import multer from "multer";
+import fs from "fs";
 import { v2 as cloudinary } from "cloudinary";
 
 const app = express();
@@ -13,18 +14,24 @@ app.use(express.urlencoded({ extended: true, limit: "50mb" }));
 // --- Cloudinary config ---
 cloudinary.config({
   cloud_name: "dp5br2uug",
-  api_key: "786482751155221",     // replace with your key
-  api_secret: "lDqOIxijkgS1OCK8n69M84dh7l8" // replace with your secret
+  api_key: "358437331856298",     
+  api_secret: "SQHZloOPtUq-3IBsBoSvXcXjOTY"
 });
 
 // --- Upload route ---
 app.post("/upload-cloudinary", upload.single("file"), async (req, res) => {
+  if (!req.file) return res.status(400).json({ error: "No file uploaded" });
+
+  const filePath = req.file.path;
+
   try {
-    const filePath = req.file.path;
     const result = await cloudinary.uploader.upload(filePath, {
       folder: "farm_app",
       resource_type: "auto"
     });
+
+    // Delete local temp file after upload
+    fs.unlinkSync(filePath);
 
     res.json({
       secure_url: result.secure_url,
@@ -33,7 +40,10 @@ app.post("/upload-cloudinary", upload.single("file"), async (req, res) => {
     });
   } catch (err) {
     console.error("❌ Upload error:", err);
-    res.status(500).json({ error: "Failed to upload file" });
+    // Delete local file if upload fails
+    if (fs.existsSync(filePath)) fs.unlinkSync(filePath);
+
+    res.status(500).json({ error: "Failed to upload file", details: err.message });
   }
 });
 
