@@ -99,10 +99,22 @@ document.addEventListener("DOMContentLoaded", () => {
     const landDocs = document.getElementById("land-documents").files;
 
     try {
-      const imageUploadPromises = Array.from(landImages).map(file => uploadToCloudinary(file));
-      const docUploadPromises = Array.from(landDocs).map(file => uploadToCloudinary(file));
+      // Send all files to backend for multi-file upload
+      const formData = new FormData();
+      Array.from(landImages).forEach(file => formData.append("files", file));
+      Array.from(landDocs).forEach(file => formData.append("files", file));
 
-      const allUploadResults = await Promise.all([...imageUploadPromises, ...docUploadPromises]);
+      const res = await fetch("http://localhost:5000/upload-cloudinary", {
+        method: "POST",
+        body: formData,
+      });
+
+      if (!res.ok) {
+        const errorText = await res.text();
+        throw new Error("Upload failed: " + errorText);
+      }
+
+      const allUploadResults = await res.json();
 
       const imageResults = allUploadResults.slice(0, landImages.length);
       const docResults = allUploadResults.slice(landImages.length);

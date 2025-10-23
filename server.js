@@ -18,31 +18,35 @@ cloudinary.config({
   api_secret: "SQHZloOPtUq-3IBsBoSvXcXjOTY"
 });
 
-// --- Upload route ---
-app.post("/upload-cloudinary", upload.single("file"), async (req, res) => {
-  if (!req.file) return res.status(400).json({ error: "No file uploaded" });
-
-  const filePath = req.file.path;
+// --- Upload route for multiple files ---
+app.post("/upload-cloudinary", upload.array("files"), async (req, res) => {
+  if (!req.files || req.files.length === 0)
+    return res.status(400).json({ error: "No file uploaded" });
 
   try {
-    const result = await cloudinary.uploader.upload(filePath, {
-      folder: "farm_app",
-      resource_type: "auto"
-    });
+    const uploadResults = [];
 
-    // Delete local temp file after upload
-    fs.unlinkSync(filePath);
+    for (const file of req.files) {
+      const result = await cloudinary.uploader.upload(file.path, {
+        folder: "farm_app",
+        resource_type: "auto",
+      });
 
-    res.json({
-      secure_url: result.secure_url,
-      public_id: result.public_id,
-      resource_type: result.resource_type
-    });
+      uploadResults.push({
+        secure_url: result.secure_url,
+        public_id: result.public_id,
+        resource_type: result.resource_type,
+      });
+
+      // Delete temp file after upload
+      fs.unlinkSync(file.path);
+    }
+
+    res.json(uploadResults);
   } catch (err) {
     console.error("❌ Upload error:", err);
-    // Delete local file if upload fails
-    if (fs.existsSync(filePath)) fs.unlinkSync(filePath);
-
+    // Clean up temp files if upload fails
+    req.files.forEach(f => fs.existsSync(f.path) && fs.unlinkSync(f.path));
     res.status(500).json({ error: "Failed to upload file", details: err.message });
   }
 });
@@ -57,9 +61,7 @@ app.delete("/delete-cloudinary/:publicId", async (req, res) => {
 
     const result = await cloudinary.uploader.destroy(publicId, { resource_type: resourceType });
 
-    if (result.result !== "ok" && result.result !== "not found") {
-      throw new Error(result.result);
-    }
+    if (result.result !== "ok" && result.result !== "not found") throw new Error(result.result);
 
     res.json({ success: true });
   } catch (err) {
@@ -69,6 +71,4 @@ app.delete("/delete-cloudinary/:publicId", async (req, res) => {
 });
 
 const PORT = process.env.PORT || 5000;
-app.listen(PORT, () =>
-  console.log(`✅ Server running on http://localhost:${PORT}`)
-);
+app.listen(PORT, () => console.log(`✅ Server running on http://localhost:${PORT}`));
