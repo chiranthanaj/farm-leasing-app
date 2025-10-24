@@ -13,8 +13,8 @@ app.use(express.urlencoded({ extended: true, limit: "50mb" }));
 // --- Cloudinary config ---
 cloudinary.config({
   cloud_name: "dp5br2uug",
-  api_key: "YOUR_API_KEY",      // replace with your actual API key
-  api_secret: "YOUR_API_SECRET" // replace with your actual API secret
+  api_key: "358437331856298",      // replace with your actual API key
+  api_secret: "SQHZloOPtUq-3IBsBoSvXcXjOTY" // replace with your actual API secret
 });
 
 // --- Upload route ---
