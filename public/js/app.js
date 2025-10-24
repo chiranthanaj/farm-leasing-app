@@ -60,7 +60,7 @@ document.addEventListener("DOMContentLoaded", () => {
   });
 
   // -------------------- Role selection --------------------
-  document.getElementById("role-seller").addEventListener("click", async () => {
+  document.getElementById("role-seller").addEventListener("click", () => {
     showScreen("seller-screen");
     loadSellerUploads();
   });
@@ -94,11 +94,7 @@ document.addEventListener("DOMContentLoaded", () => {
     const usageSuitability = document.getElementById("usage-suitability").value;
     const pastUsage = document.getElementById("past-usage").value;
     const contactInfo = document.getElementById("contact-info").value;
-
     const landImages = document.getElementById("land-images").files;
-
-    console.log("Preparing to upload images...");
-    console.log("Images:", landImages);
 
     try {
       const formData = new FormData();
@@ -106,7 +102,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
       const res = await fetch("http://localhost:5000/upload-cloudinary", {
         method: "POST",
-        body: formData,
+        body: formData
       });
 
       if (!res.ok) {
@@ -114,8 +110,7 @@ document.addEventListener("DOMContentLoaded", () => {
         throw new Error("Upload failed: " + errorText);
       }
 
-      const uploadResults = await res.json();
-      console.log("Upload results:", uploadResults);
+      const uploadResults = await res.json(); // will be [] if no files
 
       await db.collection("lands").add({
         location,
@@ -134,6 +129,7 @@ document.addEventListener("DOMContentLoaded", () => {
       alert("Land uploaded successfully!");
       e.target.reset();
       loadSellerUploads();
+
     } catch (err) {
       console.error("❌ Upload failed:", err);
       alert("Upload failed: " + err.message);
@@ -147,7 +143,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
     const querySnapshot = await db.collection("lands").orderBy("createdAt", "desc").get();
 
-    querySnapshot.forEach((doc) => {
+    querySnapshot.forEach(doc => {
       const land = doc.data();
       const docId = doc.id;
 
@@ -208,7 +204,7 @@ document.addEventListener("DOMContentLoaded", () => {
     const resultsDiv = document.getElementById("search-results");
     resultsDiv.innerHTML = "";
 
-    querySnapshot.forEach((doc) => {
+    querySnapshot.forEach(doc => {
       const land = doc.data();
       if (
         (!location || (land.location && land.location.toLowerCase().includes(location))) &&
