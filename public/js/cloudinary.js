@@ -1,33 +1,39 @@
-const CLOUDINARY_URL = "https://api.cloudinary.com/v1_1/dp5br2uug/auto/upload";
-const CLOUDINARY_UPLOAD_PRESET = "unsigned_preset";
+const CLOUDINARY_URL = "https://api.cloudinary.com/v1_1/dp5br2uug/auto/upload"; // Not used for upload, but kept for context
+const CLOUDINARY_UPLOAD_PRESET = "unsigned_preset"; // Not used for upload, but kept for context
 
 // backend URL (where server.js is running)
-const BACKEND_URL = "http://localhost:3000"; 
+const BACKEND_URL = "http://localhost:5000"; 
 
 /**
- * Uploads a file (image or document) to Cloudinary using unsigned upload.
- * Returns the Cloudinary response containing secure_url, public_id.
+ * Uploads a file by sending it to the Node.js backend for signed Cloudinary upload.
+ * This function is now sending data to BACKEND_URL/upload-cloudinary.
  */
 export async function uploadToCloudinary(file) {
   const formData = new FormData();
-  formData.append("file", file);
-  formData.append("upload_preset", CLOUDINARY_UPLOAD_PRESET);
+  // IMPORTANT: The field name must be 'file' to match 'upload.single("file")' in server.js
+  formData.append("file", file); 
 
   try {
-    const res = await fetch(CLOUDINARY_URL, {
+    // 🎯 Hitting your local backend server's signed upload route
+    const res = await fetch(`${BACKEND_URL}/upload-cloudinary`, {
       method: "POST",
       body: formData,
     });
 
-    if (!res.ok) throw new Error("Cloudinary upload failed");
+    if (!res.ok) {
+        // Read the error message from the backend response
+        const errData = await res.json();
+        throw new Error("Upload failed: " + JSON.stringify(errData));
+    }
 
     const data = await res.json();
+    // Your backend is responsible for returning secure_url and public_id
     return {
       secure_url: data.secure_url,
       public_id: data.public_id,
     };
   } catch (err) {
-    console.error("❌ Cloudinary upload error:", err);
+    console.error("❌ Upload error:", err);
     throw err;
   }
 }
@@ -38,6 +44,7 @@ export async function uploadToCloudinary(file) {
  */
 export async function deleteFromCloudinary(publicId) {
   try {
+    // Hitting your local backend server's delete route
     const res = await fetch(`${BACKEND_URL}/delete-cloudinary/${publicId}`, {
       method: "DELETE",
     });
