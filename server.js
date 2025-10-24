@@ -2,7 +2,6 @@ import express from "express";
 import cors from "cors";
 import multer from "multer";
 import { v2 as cloudinary } from "cloudinary";
-import fs from "fs";
 
 const app = express();
 const upload = multer({ dest: "uploads/" });
@@ -18,30 +17,26 @@ cloudinary.config({
   api_secret: "SQHZloOPtUq-3IBsBoSvXcXjOTY"
 });
 
-// --- Upload route ---
+// --- Upload route (supports single or multiple files) ---
 app.post("/upload-cloudinary", upload.array("files"), async (req, res) => {
   try {
-    const files = req.files || [];
+    if (!req.files || req.files.length === 0) return res.json([]);
 
-    if (files.length === 0) {
-      // No files uploaded, return empty array
-      return res.json([]);
-    }
-
-    const uploadPromises = files.map(file =>
-      cloudinary.uploader.upload(file.path, {
+    const results = [];
+    for (const file of req.files) {
+      const result = await cloudinary.uploader.upload(file.path, {
         folder: "farm_app",
         resource_type: "auto"
-      }).finally(() => fs.unlink(file.path, () => {})) // delete temp file
-    );
+      });
+      results.push({
+        secure_url: result.secure_url,
+        public_id: result.public_id,
+        resource_type: result.resource_type
+      });
+    }
 
-    const results = await Promise.all(uploadPromises);
-
-    res.json(results.map(r => ({
-      secure_url: r.secure_url,
-      public_id: r.public_id,
-      resource_type: r.resource_type
-    })));
+    console.log("📦 Upload results:", results);
+    res.json(results);
   } catch (err) {
     console.error("❌ Upload error:", err);
     res.status(500).json({ error: "Failed to upload file" });
@@ -70,6 +65,4 @@ app.delete("/delete-cloudinary/:publicId", async (req, res) => {
 });
 
 const PORT = process.env.PORT || 5000;
-app.listen(PORT, () =>
-  console.log(`✅ Server running on http://localhost:${PORT}`)
-);
+app.listen(PORT, () => console.log(`✅ Server running on http://localhost:${PORT}`));

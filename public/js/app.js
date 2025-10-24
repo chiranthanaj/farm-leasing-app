@@ -94,23 +94,29 @@ document.addEventListener("DOMContentLoaded", () => {
     const usageSuitability = document.getElementById("usage-suitability").value;
     const pastUsage = document.getElementById("past-usage").value;
     const contactInfo = document.getElementById("contact-info").value;
+
     const landImages = document.getElementById("land-images").files;
 
+    let uploadResults = [];
     try {
-      const formData = new FormData();
-      Array.from(landImages).forEach(file => formData.append("files", file));
+      if (landImages.length > 0) {
+        console.log("📤 Uploading images to backend...");
+        const formData = new FormData();
+        Array.from(landImages).forEach(file => formData.append("files", file));
 
-      const res = await fetch("http://localhost:5000/upload-cloudinary", {
-        method: "POST",
-        body: formData
-      });
+        const res = await fetch("http://localhost:5000/upload-cloudinary", {
+          method: "POST",
+          body: formData
+        });
 
-      if (!res.ok) {
-        const errorText = await res.text();
-        throw new Error("Upload failed: " + errorText);
+        if (!res.ok) {
+          const errorText = await res.text();
+          throw new Error("Upload failed: " + errorText);
+        }
+
+        uploadResults = await res.json();
+        console.log("📦 Upload response:", uploadResults);
       }
-
-      const uploadResults = await res.json(); // will be [] if no files
 
       await db.collection("lands").add({
         location,
@@ -120,13 +126,13 @@ document.addEventListener("DOMContentLoaded", () => {
         usageSuitability,
         pastUsage,
         contactInfo,
-        imageUrls: uploadResults.map(r => r.secure_url),
-        imagePublicIds: uploadResults.map(r => r.public_id),
-        imageResourceTypes: uploadResults.map(r => r.resource_type || "image"),
+        imageUrls: (uploadResults || []).map(r => r.secure_url),
+        imagePublicIds: (uploadResults || []).map(r => r.public_id),
+        imageResourceTypes: (uploadResults || []).map(r => r.resource_type || "image"),
         createdAt: firebase.firestore.FieldValue.serverTimestamp()
       });
 
-      alert("Land uploaded successfully!");
+      alert("✅ Land uploaded successfully!");
       e.target.reset();
       loadSellerUploads();
 
