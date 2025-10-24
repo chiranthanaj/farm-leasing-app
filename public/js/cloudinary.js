@@ -1,28 +1,30 @@
-const BACKEND_URL = "http://localhost:5000"; // use your backend URL
+const CLOUDINARY_URL = "https://api.cloudinary.com/v1_1/dp5br2uug/auto/upload";
+const CLOUDINARY_UPLOAD_PRESET = "unsigned_preset";
 
+// backend URL (where server.js is running)
+const BACKEND_URL = "http://localhost:3000"; 
+
+/**
+ * Uploads a file (image or document) to Cloudinary using unsigned upload.
+ * Returns the Cloudinary response containing secure_url, public_id.
+ */
 export async function uploadToCloudinary(file) {
-  if (!file) throw new Error("No file provided for upload");
+  const formData = new FormData();
+  formData.append("file", file);
+  formData.append("upload_preset", CLOUDINARY_UPLOAD_PRESET);
 
   try {
-    const formData = new FormData();
-    formData.append("file", file);
-
-    const res = await fetch(`${BACKEND_URL}/upload-cloudinary`, {
+    const res = await fetch(CLOUDINARY_URL, {
       method: "POST",
       body: formData,
     });
 
-    if (!res.ok) {
-      const text = await res.text();
-      throw new Error("Upload failed: " + text);
-    }
+    if (!res.ok) throw new Error("Cloudinary upload failed");
 
     const data = await res.json();
-
     return {
       secure_url: data.secure_url,
       public_id: data.public_id,
-      resource_type: data.resource_type || "image",
     };
   } catch (err) {
     console.error("❌ Cloudinary upload error:", err);
@@ -30,18 +32,21 @@ export async function uploadToCloudinary(file) {
   }
 }
 
-export async function deleteFromCloudinary(publicId, resourceType = "auto") {
-  if (!publicId) throw new Error("No publicId provided for deletion");
-
+/**
+ * Deletes a file from Cloudinary by calling backend route.
+ * publicId: the Cloudinary public_id
+ */
+export async function deleteFromCloudinary(publicId) {
   try {
-    const res = await fetch(`${BACKEND_URL}/delete-cloudinary/${publicId}?resource_type=${resourceType}`, {
+    const res = await fetch(`${BACKEND_URL}/delete-cloudinary/${publicId}`, {
       method: "DELETE",
     });
 
     const data = await res.json();
-    if (!res.ok || !data.success) throw new Error("Delete failed: " + JSON.stringify(data));
+    if (!res.ok || !data.success) {
+      throw new Error("Delete failed: " + JSON.stringify(data));
+    }
 
-    console.log(`✅ Successfully deleted ${publicId} from Cloudinary`);
     return true;
   } catch (err) {
     console.error("❌ Delete error:", err);
