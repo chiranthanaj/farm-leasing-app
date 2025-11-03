@@ -101,21 +101,25 @@
 
   </div>
 
-    <!-- --- MANDATORY FIREBASE INITIALIZATION SCRIPT (Modern Modular V9+) --- -->
+    <!-- --- MANDATORY FIREBASE INITIALIZATION SCRIPT (Now with Auth State Management) --- -->
     <script type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
-        import { getAuth, signInWithCustomToken, signInAnonymously, createUserWithEmailAndPassword, signInWithEmailAndPassword } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
+        import { getAuth, signInWithCustomToken, signInAnonymously, onAuthStateChanged, createUserWithEmailAndPassword, signInWithEmailAndPassword, signOut } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
         import { getFirestore, FieldValue } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
         
-        // 1. Initialize Firebase App using the provided config
+        // 1. Initialize Firebase App and Services
         const firebaseConfig = JSON.parse(typeof __firebase_config !== 'undefined' ? __firebase_config : '{}');
         const app = initializeApp(firebaseConfig);
 
-        // 2. Expose services globally for app.js
         window.auth = getAuth(app);
         window.db = getFirestore(app);
         
-        // 3. Create V8 compatibility layer for FieldValue.serverTimestamp() used in app.js
+        // Expose critical global variables for app.js
+        window.userId = null; 
+        window.isAuthReady = false; 
+        window.__app_id = typeof __app_id !== 'undefined' ? __app_id : 'default-app-id';
+
+        // 2. Create V8 compatibility layer for FieldValue.serverTimestamp() used in app.js
         window.firebase = {
             firestore: {
                 FieldValue: {
@@ -123,24 +127,61 @@
                 }
             }
         };
+        
+        // Global utility function for displaying messages (replaces alert/confirm)
+        window.displayMessage = (message, isError = false) => {
+            const box = document.getElementById('platform-message-box');
+            box.textContent = message;
+            box.className = `fixed top-4 right-4 z-50 p-4 rounded-xl shadow-2xl text-white font-semibold transition-opacity duration-300 opacity-100 ${isError ? 'bg-red-600' : 'bg-green-600'}`;
+            setTimeout(() => {
+                box.classList.replace('opacity-100', 'opacity-0');
+            }, 3000);
+        };
 
-        // 4. Mandatory Authentication using Canvas Token
+
+        // 3. Mandatory Authentication and Auth State Listener
         async function initializeAuth() {
             if (typeof __initial_auth_token !== 'undefined' && __initial_auth_token) {
-                await signInWithCustomToken(window.auth, __initial_auth_token).catch(e => {
+                // Try custom sign-in first
+                try {
+                    await signInWithCustomToken(window.auth, __initial_auth_token);
+                } catch (e) {
                     console.error("Custom token sign-in failed, falling back to anonymous:", e);
-                    signInAnonymously(window.auth);
-                });
+                    await signInAnonymously(window.auth);
+                }
             } else {
+                // Anonymous sign-in if no token is available
                 await signInAnonymously(window.auth);
             }
+            
+            // Set up the listener to confirm the state is ready
+            onAuthStateChanged(window.auth, (user) => {
+                if (user) {
+                    window.userId = user.uid;
+                    window.isAuthReady = true;
+                    console.log("Auth State Ready. User ID:", window.userId);
+                    // Crucial: Manually trigger a window event to notify app.js
+                    window.dispatchEvent(new CustomEvent('firebaseAuthReady'));
+                } else {
+                    window.userId = null;
+                    window.isAuthReady = true;
+                    console.log("Auth State Ready. No user logged in.");
+                    window.dispatchEvent(new CustomEvent('firebaseAuthReady'));
+                }
+            });
         }
 
-        // Run authentication on load
         initializeAuth();
+        
+        // Expose Auth functions for app.js to use:
+        window.authFunctions = {
+            createUserWithEmailAndPassword, 
+            signInWithEmailAndPassword, 
+            signOut,
+        };
     </script>
     
-    <!-- Load your main application logic as modules -->
+    <!-- Load your main application logic ONLY after Firebase is set up -->
   <script type="module" src="js/cloudinary.js"></script>
   <script type="module" src="js/app.js"></script>
 </body>
