@@ -3,9 +3,13 @@ import { uploadToCloudinary, deleteFromCloudinary } from "./cloudinary.js";
 // --- Global Constants & Utilities ---
 
 // Mandatory global for Canvas environment pathing
-const appId = typeof __app_id !== 'undefined' ? __app_id : 'default-app-id';
+// We use a robust default in case __app_id is missing, but this value MUST match
+// the {appId} placeholder in your Firestore Security Rules.
+const appId = typeof __app_id !== 'undefined' ? __app_id : 'farm-leasing-app';
 
 // Firestore collection path for public data (accessible by all users)
+// This path MUST exactly match the structure in your Firebase Rules:
+// match /artifacts/{appId}/public/data/lands/{landId}
 const LANDS_COLLECTION_PATH = `artifacts/${appId}/public/data/lands`;
 
 /**
@@ -16,16 +20,16 @@ const LANDS_COLLECTION_PATH = `artifacts/${appId}/public/data/lands`;
 function displayMessage(message, type = 'info') {
     let box = document.getElementById('platform-message-box');
     if (!box) {
-        box = document.createElement('div');
-        box.id = 'platform-message-box';
-        box.className = 'fixed top-4 right-4 z-50 p-4 rounded-xl shadow-2xl text-white font-semibold transition-opacity duration-300 opacity-0';
-        document.body.appendChild(box);
+        // Fallback or error if the platform box isn't initialized, should not happen with the provided HTML
+        console.warn("Message box element not found.");
+        return;
     }
 
     let bgColor = 'bg-gray-700';
     if (type === 'success') bgColor = 'bg-green-600';
     if (type === 'error') bgColor = 'bg-red-600';
 
+    // Ensure it's visible
     box.className = `fixed top-4 right-4 z-50 p-4 rounded-xl shadow-2xl text-white font-semibold transition-opacity duration-300 ${bgColor} opacity-100`;
     box.textContent = message;
 
@@ -46,6 +50,13 @@ function showScreen(id) {
 // --- Main Application Logic ---
 document.addEventListener("DOMContentLoaded", () => {
     
+    // Check if Firebase globals are available before continuing
+    if (typeof auth === 'undefined' || typeof db === 'undefined') {
+        console.error("Firebase services (auth, db) are not initialized. Check index.html script.");
+        displayMessage("App failed to start. Check console for Firebase initialization errors.", 'error');
+        return;
+    }
+    
     // Initial state setup
     showScreen("welcome-screen");
     let isLogin = true;
@@ -53,11 +64,8 @@ document.addEventListener("DOMContentLoaded", () => {
     // --- Authentication State Listener (Critical) ---
     auth.onAuthStateChanged(user => {
         if (user) {
-            // User is signed in, check if they have selected a role previously or go to role selection
-            // For now, always route to role selection after successful auth
             showScreen("role-selection-screen");
         } else {
-            // User is signed out, show welcome screen
             showScreen("welcome-screen");
         }
     });
@@ -98,18 +106,19 @@ document.addEventListener("DOMContentLoaded", () => {
         const password = document.getElementById("password").value;
 
         if (!email || !password) {
-             return displayMessage("Email and password are required.", 'error');
+            return displayMessage("Email and password are required.", 'error');
         }
 
         try {
             if (isLogin) {
+                // signInWithEmailAndPassword is exposed globally by the V9 modular setup
                 await auth.signInWithEmailAndPassword(email, password);
                 displayMessage("Login successful!", 'success');
             } else {
+                // createUserWithEmailAndPassword is exposed globally by the V9 modular setup
                 await auth.createUserWithEmailAndPassword(email, password);
                 displayMessage("Registration successful! Please select your role.", 'success');
             }
-            // onAuthStateChanged handles screen navigation to role-selection-screen
         } catch (err) {
             console.error("Auth error:", err);
             displayMessage(`Authentication failed: ${err.message}`, 'error');
@@ -119,7 +128,8 @@ document.addEventListener("DOMContentLoaded", () => {
     // --- Role selection ---
     document.getElementById("role-seller").addEventListener("click", async () => {
         showScreen("seller-screen");
-        loadSellerUploads();
+        // Load uploads immediately when entering seller screen
+        loadSellerUploads(); 
     });
     document.getElementById("role-buyer").addEventListener("click", () => {
         showScreen("buyer-screen");
@@ -150,7 +160,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
         const ownerId = auth.currentUser ? auth.currentUser.uid : null;
         if (!ownerId) {
-             return displayMessage("You must be logged in to upload.", 'error');
+            return displayMessage("You must be logged in to upload.", 'error');
         }
 
         const location = document.getElementById("land-location").value;
@@ -183,7 +193,7 @@ document.addEventListener("DOMContentLoaded", () => {
             const docUrls = uploadResults.slice(landImages.length).map(result => result.secure_url);
             const docPublicIds = uploadResults.slice(landImages.length).map(result => result.public_id);
 
-            // Save metadata to Firestore in the public path, tagged with ownerId
+            // Save metadata to Firestore using the CORRECT LANDS_COLLECTION_PATH
             await db.collection(LANDS_COLLECTION_PATH).add({
                 ownerId, // CRITICAL for security and filtering
                 location,
@@ -197,7 +207,8 @@ document.addEventListener("DOMContentLoaded", () => {
                 docUrls,
                 imagePublicIds,
                 docPublicIds,
-                createdAt: firebase.firestore.FieldValue.serverTimestamp()
+                // Uses the V8 compatibility object exposed in index.html
+                createdAt: firebase.firestore.FieldValue.serverTimestamp() 
             });
 
             displayMessage("Land uploaded successfully!", 'success');
@@ -205,7 +216,12 @@ document.addEventListener("DOMContentLoaded", () => {
             loadSellerUploads();
         } catch (err) {
             console.error("❌ Upload failed:", err);
-            displayMessage("Upload failed: Check server logs or Cloudinary credentials.", 'error');
+            // Enhanced error check to specifically catch permission errors
+            if (err.code === 'permission-denied') {
+                displayMessage("Upload failed: Missing or insufficient permissions. Check your **Firestore Security Rules** or authentication status.", 'error');
+            } else {
+                displayMessage("Upload failed: Check server logs or Cloudinary credentials. Error: " + err.message, 'error');
+            }
         }
     });
 
@@ -221,7 +237,7 @@ document.addEventListener("DOMContentLoaded", () => {
         }
 
         try {
-            // 🎯 FILTER by current user's UID
+            // FILTER by current user's UID
             const querySnapshot = await db.collection(LANDS_COLLECTION_PATH)
                 .where("ownerId", "==", ownerId) 
                 .get();
@@ -231,12 +247,12 @@ document.addEventListener("DOMContentLoaded", () => {
                 uploads.push({ ...doc.data(), id: doc.id });
             });
 
-            // 🎯 Client-side sort (replaces Firestore orderBy)
+            // Client-side sort (AVOIDS the need for a Firestore index on orderBy)
             uploads.sort((a, b) => (b.createdAt?.seconds || 0) - (a.createdAt?.seconds || 0));
 
             if (uploads.length === 0) {
-                 uploadsDiv.innerHTML = "<p class='text-gray-600'>You have no active listings.</p>";
-                 return;
+                uploadsDiv.innerHTML = "<p class='text-gray-600'>You have no active listings.</p>";
+                return;
             }
 
             uploads.forEach((land) => {
@@ -259,7 +275,7 @@ document.addEventListener("DOMContentLoaded", () => {
             document.querySelectorAll(".delete-btn").forEach(btn => {
                 btn.addEventListener("click", async () => {
                     const id = btn.dataset.id;
-                    btn.disabled = true; // Prevent double clicking
+                    btn.disabled = true; 
                     btn.textContent = "Deleting...";
 
                     try {
@@ -269,13 +285,17 @@ document.addEventListener("DOMContentLoaded", () => {
 
                         const land = docSnap.data();
 
+                        // Client-side owner check for immediate feedback (Security is enforced by rules)
+                        if (land.ownerId !== auth.currentUser.uid) {
+                            throw new Error("You do not have permission to delete this listing.");
+                        }
+
                         // Concurrently delete files from Cloudinary
                         const publicIds = [...(land.imagePublicIds || []), ...(land.docPublicIds || [])];
                         
                         const deletePromises = publicIds.map(publicId =>
                             deleteFromCloudinary(publicId).catch(err => {
                                 console.error(`Failed to delete asset ID ${publicId}:`, err);
-                                // Continue even if one deletion fails, but log it.
                                 return null;
                             })
                         );
@@ -298,7 +318,12 @@ document.addEventListener("DOMContentLoaded", () => {
             });
         } catch (err) {
             console.error("Failed to load seller uploads:", err);
-            displayMessage("Failed to load listings. Check your Firebase rules.", 'error');
+            // CRITICAL CATCH: Explicitly catch permission denial for reads
+            if (err.code === 'permission-denied') {
+                 uploadsDiv.innerHTML = "<p class='text-red-500'>Permission Denied: Ensure your **Firestore Security Rules** allow authenticated users to read the collection path.</p>";
+            } else {
+                 displayMessage("Failed to load listings. Check your Firebase rules or network connection.", 'error');
+            }
         }
     }
 
@@ -312,56 +337,69 @@ document.addEventListener("DOMContentLoaded", () => {
         const soilType = document.getElementById("search-soil-type").value.toLowerCase().trim();
         const usageSuitability = document.getElementById("search-usage-suitability").value.toLowerCase().trim();
 
-        // 🎯 Search query targets the public collection path
-        const querySnapshot = await db.collection(LANDS_COLLECTION_PATH).get();
         const resultsDiv = document.getElementById("search-results");
         resultsDiv.innerHTML = "";
         
         const filteredResults = [];
 
-        querySnapshot.forEach((doc) => {
-            const land = doc.data();
+        try {
+            // Query targets the public collection path (requires read permission for authenticated users)
+            const querySnapshot = await db.collection(LANDS_COLLECTION_PATH).get();
+            
+            querySnapshot.forEach((doc) => {
+                const land = doc.data();
 
-            // Client-side filtering logic
-            const matchesLocation = !location || (land.location && land.location.toLowerCase().includes(location));
-            const matchesSoil = !soilType || (land.soilType && land.soilType.toLowerCase().includes(soilType));
-            const matchesUsage = !usageSuitability || (land.usageSuitability && land.usageSuitability.toLowerCase().includes(usageSuitability));
-            const matchesPrice = land.price >= priceMin && land.price <= priceMax;
+                // Client-side filtering logic
+                const matchesLocation = !location || (land.location && land.location.toLowerCase().includes(location));
+                const matchesSoil = !soilType || (land.soilType && land.soilType.toLowerCase().includes(soilType));
+                const matchesUsage = !usageSuitability || (land.usageSuitability && land.usageSuitability.toLowerCase().includes(usageSuitability));
+                const matchesPrice = land.price >= priceMin && land.price <= priceMax;
 
-            if (matchesLocation && matchesSoil && matchesUsage && matchesPrice) {
-                filteredResults.push(land);
+                if (matchesLocation && matchesSoil && matchesUsage && matchesPrice) {
+                    filteredResults.push(land);
+                }
+            });
+
+            filteredResults.forEach((land) => {
+                let imagesHTML = land.imageUrls && land.imageUrls.length > 0 ?
+                    land.imageUrls.map(url => `<img src="${url}" class="w-full h-40 object-cover rounded mb-2" alt="Land Image"/>`).join("") :
+                    '<div class="text-gray-400 h-40 flex items-center justify-center bg-gray-100 rounded">No Images Available</div>';
+
+                let docsHTML = land.docUrls && land.docUrls.length > 0 ?
+                    `<div class="mt-2"><h4 class="font-semibold text-green-700">Documents:</h4><ul class="list-disc ml-6">
+                    ${land.docUrls.map(url => `<li><a href="${url}" target="_blank" class="text-blue-600 hover:text-blue-800 underline">View Document</a></li>`).join("")}
+                    </ul></div>` : '';
+
+                resultsDiv.innerHTML += `
+                    <div class="p-6 bg-gray-50 border border-green-200 rounded-xl shadow-lg text-left">
+                        ${imagesHTML}
+                        <h3 class="font-bold text-xl text-green-800">${land.location} - ${land.size} acres</h3>
+                        <p class="text-lg font-medium text-gray-700">Monthly Price: <span class="text-green-600">₹${land.price}</span></p>
+                        <p class="mt-1">Soil Type: <span class="font-semibold">${land.soilType}</span></p>
+                        <p>Suitable for: ${land.usageSuitability}</p>
+                        <p>Contact: <span class="font-mono text-sm bg-yellow-100 p-1 rounded">${land.contactInfo}</span></p>
+                        ${docsHTML}
+                    </div>
+                `;
+            });
+
+            if (filteredResults.length === 0) {
+                resultsDiv.innerHTML = `<p class="text-xl text-red-500 font-semibold mt-4">No lands found for your criteria.</p>`;
+            } else {
+                displayMessage(`${filteredResults.length} listings found.`, 'info');
             }
-        });
 
-        filteredResults.forEach((land) => {
-             let imagesHTML = land.imageUrls && land.imageUrls.length > 0 ?
-                land.imageUrls.map(url => `<img src="${url}" class="w-full h-40 object-cover rounded mb-2" alt="Land Image"/>`).join("") :
-                '<div class="text-gray-400 h-40 flex items-center justify-center bg-gray-100 rounded">No Images Available</div>';
+            showScreen("buyer-results-screen");
 
-            let docsHTML = land.docUrls && land.docUrls.length > 0 ?
-                `<div class="mt-2"><h4 class="font-semibold text-green-700">Documents:</h4><ul class="list-disc ml-6">
-                 ${land.docUrls.map(url => `<li><a href="${url}" target="_blank" class="text-blue-600 hover:text-blue-800 underline">View Document</a></li>`).join("")}
-                 </ul></div>` : '';
-
-            resultsDiv.innerHTML += `
-                <div class="p-6 bg-gray-50 border border-green-200 rounded-xl shadow-lg text-left">
-                    ${imagesHTML}
-                    <h3 class="font-bold text-xl text-green-800">${land.location} - ${land.size} acres</h3>
-                    <p class="text-lg font-medium text-gray-700">Monthly Price: <span class="text-green-600">₹${land.price}</span></p>
-                    <p class="mt-1">Soil Type: <span class="font-semibold">${land.soilType}</span></p>
-                    <p>Suitable for: ${land.usageSuitability}</p>
-                    <p>Contact: <span class="font-mono text-sm bg-yellow-100 p-1 rounded">${land.contactInfo}</span></p>
-                    ${docsHTML}
-                </div>
-            `;
-        });
-
-        if (filteredResults.length === 0) {
-            resultsDiv.innerHTML = `<p class="text-xl text-red-500 font-semibold mt-4">No lands found for your criteria.</p>`;
-        } else {
-             displayMessage(`${filteredResults.length} listings found.`, 'info');
+        } catch (err) {
+            console.error("Failed to execute search query:", err);
+            // Catching potential permission errors on read for the buyer search
+            if (err.code === 'permission-denied') {
+                 resultsDiv.innerHTML = `<p class="text-xl text-red-500 font-semibold mt-4">Error: Permission denied. Ensure authenticated users can read listings in your Firestore Rules.</p>`;
+                 displayMessage("Search failed: Check Firestore Rules for read access.", 'error');
+            } else {
+                 displayMessage("Search failed due to an unexpected error.", 'error');
+            }
         }
-
-        showScreen("buyer-results-screen");
     });
 });
