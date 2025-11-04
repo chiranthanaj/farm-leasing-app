@@ -5,7 +5,7 @@
 const BACKEND_URL =
   window.location.hostname === "localhost"
     ? "http://localhost:5000"
-    : "https://your-deployed-backend-domain.com";
+    : "https://farm-leasing-app.onrender.com";
 
 // ====================================================
 // Upload File to Filestack via Backend
