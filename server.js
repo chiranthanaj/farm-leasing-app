@@ -1,5 +1,5 @@
 // ===============================
-// server.js — Filestack Integrated Upload Backend
+// server.js — Filestack Integrated Upload Backend (Final Fixed)
 // ===============================
 
 import express from "express";
@@ -22,35 +22,41 @@ app.use(express.urlencoded({ extended: true, limit: "50mb" }));
 
 // ======== Filestack Configuration ========
 const FILESTACK_API_KEY = process.env.FILESTACK_API_KEY || "A54XqHKu1TjCtCl3rTWhpz";
-const FILESTACK_UPLOAD_URL = `https://www.filestackapi.com/api/file?key=${FILESTACK_API_KEY}`;
+const FILESTACK_UPLOAD_URL = `https://www.filestackapi.com/api/store/S3?key=${FILESTACK_API_KEY}`;
 
 // =================================================
 // ROUTE: Upload File (Image or Document)
 // =================================================
 app.post("/upload-cloudinary", upload.single("files"), async (req, res) => {
   try {
-    if (!req.file) return res.json([]);
+    // ✅ handle missing file safely
+    if (!req.file) {
+      console.error("❌ No file received by backend!");
+      return res.status(400).json({ error: "No file uploaded" });
+    }
 
     const file = req.file;
-    const form = new FormData();
 
+    const form = new FormData();
     const fileStream = fs.createReadStream(file.path);
-    form.append("file", fileStream, {
+    form.append("fileUpload", fileStream, {
       filename: file.originalname || path.basename(file.path),
       contentType: file.mimetype || "application/octet-stream",
     });
 
+    const headers = form.getHeaders();
+
     const response = await axios.post(FILESTACK_UPLOAD_URL, form, {
-      headers: form.getHeaders(),
+      headers,
       maxContentLength: Infinity,
       maxBodyLength: Infinity,
     });
 
-    // Delete temp file after upload
+    // 🧹 delete temp file after upload
     try {
       fs.unlinkSync(file.path);
     } catch (err) {
-      console.warn("⚠️ Warning: Failed to delete temp file:", file.path);
+      console.warn("⚠️ Failed to delete temp file:", file.path);
     }
 
     const data = response.data || {};
@@ -60,12 +66,13 @@ app.post("/upload-cloudinary", upload.single("files"), async (req, res) => {
     const resource_type = data.mimetype || "file";
 
     if (!secure_url) {
-      console.error("❌ Invalid Filestack response:", data);
-      return res.status(500).json({ error: "No secure URL returned from Filestack" });
+      console.error("❌ Filestack returned no URL:", data);
+      return res.status(500).json({ error: "Filestack returned no URL", raw: data });
     }
 
     console.log("✅ Uploaded to Filestack:", secure_url);
 
+    // ✅ send consistent array like frontend expects
     return res.json([
       {
         secure_url,
@@ -75,10 +82,7 @@ app.post("/upload-cloudinary", upload.single("files"), async (req, res) => {
     ]);
   } catch (err) {
     console.error("❌ Upload to Filestack error:", err.response?.data || err.message);
-    return res.status(500).json({
-      error: "Upload failed",
-      details: err.response?.data || err.message,
-    });
+    return res.status(500).json({ error: "Upload failed", details: err.message });
   }
 });
 
@@ -97,7 +101,7 @@ app.delete("/delete-cloudinary/:publicId", async (req, res) => {
     const response = await axios.delete(deleteUrl);
 
     if (response.status === 200) {
-      console.log("🗑️ Deleted file from Filestack:", publicId);
+      console.log("🗑️ Deleted file:", publicId);
       return res.json({ success: true });
     } else {
       console.warn("⚠️ Filestack delete returned non-200:", response.status);
@@ -105,10 +109,7 @@ app.delete("/delete-cloudinary/:publicId", async (req, res) => {
     }
   } catch (err) {
     console.error("❌ Delete error:", err.response?.data || err.message);
-    return res.status(500).json({
-      error: "Failed to delete file",
-      details: err.response?.data || err.message,
-    });
+    return res.status(500).json({ error: "Failed to delete file", details: err.message });
   }
 });
 
