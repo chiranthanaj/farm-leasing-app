@@ -179,8 +179,8 @@ async function handleLandUpload(e) {
   if (!currentUser) {
     return displayMessage("You must be logged in to upload.", "error");
   }
-  const userIdValue = currentUser.uid; // NOTE: we use `userId` field (must match rules)
 
+  const userIdValue = currentUser.uid;
   const location = document.getElementById("land-location").value;
   const size = document.getElementById("land-size").value;
   const price = document.getElementById("land-price").value;
@@ -196,35 +196,29 @@ async function handleLandUpload(e) {
     return displayMessage("Please upload at least one image.", "error");
   }
 
-  console.log("--- DEBUG Firestore Write Attempt ---");
-  console.log(`Current User ID (userId): ${userIdValue}`);
-  console.log(`Target Collection Path: ${LANDS_COLLECTION_PATH()}`);
-
   try {
-    displayMessage("Uploading files...", "info");
+    displayMessage("Uploading files to Cloudinary...", "info");
 
-    // Helper: upload single file and return the upload object (first element if array)
-    const uploadSingle = async (file) => {
+    // ✅ Upload to Cloudinary one by one and ensure valid response
+    const uploadFile = async (file) => {
       const res = await uploadToCloudinary(file);
-      return Array.isArray(res) ? res[0] : res;
+      if (!res || !res.secure_url) {
+        throw new Error("Cloudinary upload failed or returned empty.");
+      }
+      return res;
     };
 
-    // Upload images
-    const imageUploadPromises = Array.from(landImages).map(file => uploadSingle(file));
-    const docUploadPromises = Array.from(landDocs).map(file => uploadSingle(file));
+    const imageResults = await Promise.all(Array.from(landImages).map(uploadFile));
+    const docResults = await Promise.all(Array.from(landDocs).map(uploadFile));
 
-    const imageUploadResults = await Promise.all(imageUploadPromises);
-    const docUploadResults = await Promise.all(docUploadPromises);
+    const imageUrls = imageResults.map(r => r.secure_url);
+    const imagePublicIds = imageResults.map(r => r.public_id);
 
-    // Extract URLs and public IDs (guard for undefined)
-    const imageUrls = imageUploadResults.map(r => (r && r.secure_url) ? r.secure_url : null).filter(Boolean);
-    const imagePublicIds = imageUploadResults.map(r => (r && r.public_id) ? r.public_id : null).filter(Boolean);
-
-    const docUrls = docUploadResults.map(r => (r && r.secure_url) ? r.secure_url : null).filter(Boolean);
-    const docPublicIds = docUploadResults.map(r => (r && r.public_id) ? r.public_id : null).filter(Boolean);
+    const docUrls = docResults.map(r => r.secure_url);
+    const docPublicIds = docResults.map(r => r.public_id);
 
     const landData = {
-      userId: userIdValue, // <- MUST match Firestore rules
+      userId: userIdValue,
       location,
       size: parseFloat(size),
       price: Number(price),
@@ -242,13 +236,13 @@ async function handleLandUpload(e) {
     const landCollectionRef = collection(db, LANDS_COLLECTION_PATH());
     await addDoc(landCollectionRef, landData);
 
-    displayMessage("✅ Land uploaded successfully!", "success");
+    displayMessage("✅ Land and files uploaded successfully!", "success");
     e.target.reset();
     await loadSellerUploads();
 
   } catch (err) {
     console.error("❌ Upload failed:", err);
-    displayMessage(`Upload failed: ${err.message || err}`, "error");
+    displayMessage(`Upload failed: ${err.message}`, "error");
   }
 }
 
