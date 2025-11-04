@@ -32,28 +32,25 @@ app.post("/upload-cloudinary", upload.single("files"), async (req, res) => {
     if (!req.file) return res.json([]);
 
     const file = req.file;
-
     const form = new FormData();
+
     const fileStream = fs.createReadStream(file.path);
     form.append("file", fileStream, {
       filename: file.originalname || path.basename(file.path),
       contentType: file.mimetype || "application/octet-stream",
     });
-    form.append("filename", file.originalname || path.basename(file.path));
-
-    const headers = form.getHeaders();
 
     const response = await axios.post(FILESTACK_UPLOAD_URL, form, {
-      headers,
+      headers: form.getHeaders(),
       maxContentLength: Infinity,
       maxBodyLength: Infinity,
     });
 
-    // delete temp file after upload
+    // Delete temp file after upload
     try {
       fs.unlinkSync(file.path);
     } catch (err) {
-      console.warn("Warning: Failed to delete temp file:", file.path);
+      console.warn("⚠️ Warning: Failed to delete temp file:", file.path);
     }
 
     const data = response.data || {};
@@ -61,6 +58,11 @@ app.post("/upload-cloudinary", upload.single("files"), async (req, res) => {
       data.url || (data.handle ? `https://cdn.filestackcontent.com/${data.handle}` : null);
     const public_id = data.handle || null;
     const resource_type = data.mimetype || "file";
+
+    if (!secure_url) {
+      console.error("❌ Invalid Filestack response:", data);
+      return res.status(500).json({ error: "No secure URL returned from Filestack" });
+    }
 
     console.log("✅ Uploaded to Filestack:", secure_url);
 
@@ -73,7 +75,10 @@ app.post("/upload-cloudinary", upload.single("files"), async (req, res) => {
     ]);
   } catch (err) {
     console.error("❌ Upload to Filestack error:", err.response?.data || err.message);
-    return res.status(500).json({ error: "Upload failed", details: err.message });
+    return res.status(500).json({
+      error: "Upload failed",
+      details: err.response?.data || err.message,
+    });
   }
 });
 
@@ -92,15 +97,18 @@ app.delete("/delete-cloudinary/:publicId", async (req, res) => {
     const response = await axios.delete(deleteUrl);
 
     if (response.status === 200) {
-      console.log("🗑️ Deleted file:", publicId);
+      console.log("🗑️ Deleted file from Filestack:", publicId);
       return res.json({ success: true });
     } else {
-      console.warn("Filestack delete returned non-200:", response.status);
+      console.warn("⚠️ Filestack delete returned non-200:", response.status);
       return res.status(500).json({ error: "Failed to delete file" });
     }
   } catch (err) {
     console.error("❌ Delete error:", err.response?.data || err.message);
-    return res.status(500).json({ error: "Failed to delete file", details: err.message });
+    return res.status(500).json({
+      error: "Failed to delete file",
+      details: err.response?.data || err.message,
+    });
   }
 });
 
