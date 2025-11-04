@@ -116,10 +116,11 @@ const __dirname = path.dirname(__filename);
 // Serve all files from "public" folder
 app.use(express.static(path.join(__dirname, "public")));
 
-// Always return index.html for all other routes
-app.get("*", (req, res) => {
+// ✅ Express 5-compatible fallback route
+app.get("/*", (req, res) => {
   res.sendFile(path.join(__dirname, "public", "index.html"));
 });
+
 
 // =================================================
 // ✅ START SERVER
