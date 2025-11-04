@@ -1,5 +1,5 @@
 // ===============================
-// server.js — Final Filestack Integration (Matched with filestack.js)
+// server.js — Final Filestack Integration (Render + Frontend Hosting)
 // ===============================
 
 import express from "express";
@@ -10,6 +10,7 @@ import axios from "axios";
 import FormData from "form-data";
 import path from "path";
 import dotenv from "dotenv";
+import { fileURLToPath } from "url"; // ✅ add this (for static path)
 
 dotenv.config();
 
@@ -26,7 +27,7 @@ const FILESTACK_API_KEY =
 const FILESTACK_UPLOAD_URL = `https://www.filestackapi.com/api/store/S3?key=${FILESTACK_API_KEY}`;
 
 // =================================================
-// ✅ ROUTE: Upload File (Frontend → /upload-filestack)
+// ✅ ROUTE: Upload File
 // =================================================
 app.post("/upload-filestack", upload.single("file"), async (req, res) => {
   try {
@@ -53,14 +54,17 @@ app.post("/upload-filestack", upload.single("file"), async (req, res) => {
       maxBodyLength: Infinity,
     });
 
-    // 🧹 Clean temp file
+    // 🧹 Clean up temp file
     fs.unlink(file.path, (err) => {
       if (err) console.warn("⚠️ Failed to delete temp file:", err);
     });
 
     const data = response.data || {};
     const secure_url =
-      data.url || (data.handle ? `https://cdn.filestackcontent.com/${data.handle}` : null);
+      data.url ||
+      (data.handle
+        ? `https://cdn.filestackcontent.com/${data.handle}`
+        : null);
     const public_id = data.handle || null;
     const resource_type = data.mimetype || "file";
 
@@ -78,7 +82,7 @@ app.post("/upload-filestack", upload.single("file"), async (req, res) => {
 });
 
 // =================================================
-// ✅ ROUTE: Delete File (Frontend → /delete-filestack/:publicId)
+// ✅ ROUTE: Delete File
 // =================================================
 app.delete("/delete-filestack/:publicId", async (req, res) => {
   try {
@@ -104,7 +108,23 @@ app.delete("/delete-filestack/:publicId", async (req, res) => {
 });
 
 // =================================================
-// Server Listener
+// ✅ Serve Frontend (Fix for Render 404)
+// =================================================
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+
+// Serve static files from "public" folder
+app.use(express.static(path.join(__dirname, "public")));
+
+// Always return index.html for any unknown route
+app.get("*", (req, res) => {
+  res.sendFile(path.join(__dirname, "public", "index.html"));
+});
+
+// =================================================
+// ✅ Server Listener
 // =================================================
 const PORT = process.env.PORT || 5000;
-app.listen(PORT, () => console.log(`✅ Server running at http://localhost:${PORT}`));
+app.listen(PORT, () =>
+  console.log(`✅ Server running and serving frontend at port ${PORT}`)
+);
