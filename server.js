@@ -10,7 +10,7 @@ import axios from "axios";
 import FormData from "form-data";
 import path from "path";
 import dotenv from "dotenv";
-import { fileURLToPath } from "url";
+import { fileURLToPath } from "url"; // ✅ only once here!
 
 dotenv.config();
 
@@ -108,19 +108,18 @@ app.delete("/delete-filestack/:publicId", async (req, res) => {
 });
 
 // =================================================
-// ✅ STATIC FRONTEND HOSTING (for Render)
+// ✅ STATIC FRONTEND HOSTING (Express 5 Compatible)
 // =================================================
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
-// Serve all files from "public" folder
+// Serve static frontend from /public
 app.use(express.static(path.join(__dirname, "public")));
 
-// ✅ Express 5-compatible fallback route
-app.get("/*", (req, res) => {
+// ✅ Express 5 wildcard fix: use regex instead of "*"
+app.get(/.*/, (req, res) => {
   res.sendFile(path.join(__dirname, "public", "index.html"));
 });
-
 
 // =================================================
 // ✅ START SERVER
