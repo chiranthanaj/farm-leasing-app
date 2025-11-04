@@ -106,5 +106,22 @@ app.delete("/delete-filestack/:publicId", async (req, res) => {
 // =================================================
 // Server Listener
 // =================================================
+// ===============================
+// Serve Frontend Files (Static Hosting)
+// ===============================
+import path from "path";
+import { fileURLToPath } from "url";
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+
+// Serve files from your frontend folder (adjust if needed)
+app.use(express.static(path.join(__dirname, "public")));
+
+// Serve index.html for all routes
+app.get("*", (req, res) => {
+  res.sendFile(path.join(__dirname, "public", "index.html"));
+});
+
 const PORT = process.env.PORT || 5000;
 app.listen(PORT, () => console.log(`✅ Server running at http://localhost:${PORT}`));
