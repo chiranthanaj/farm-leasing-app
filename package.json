@@ -6,10 +6,12 @@
     "start": "node server.js"
   },
   "dependencies": {
-    "cloudinary": "^1.39.0",
+    "axios": "^1.13.1",
     "cors": "^2.8.5",
     "debug": "^4.4.3",
+    "dotenv": "^17.2.3",
     "express": "^5.1.0",
+    "form-data": "^4.0.4",
     "multer": "^2.0.2"
   }
 }
