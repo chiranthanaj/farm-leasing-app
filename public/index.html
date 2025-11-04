@@ -103,10 +103,21 @@
     </section>
 
   </div>
+  <script>
+  if ("serviceWorker" in navigator) {
+    window.addEventListener("load", () => {
+      navigator.serviceWorker
+        .register("/service-worker.js")
+        .then((reg) => console.log("✅ Service Worker registered:", reg))
+        .catch((err) => console.error("❌ SW registration failed:", err));
+    });
+  }
+</script>
 
   <!-- Load your app scripts -->
   <script src="js/firebaseConfig.js"></script>
   <script type="module" src="js/filestack.js"></script> <!-- ✅ Updated -->
   <script type="module" src="js/app.js"></script>
+
 </body>
 </html>

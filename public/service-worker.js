@@ -1,27 +1,8 @@
-self.addEventListener("install", (e) => {
-  e.waitUntil(
-    caches.open("farm-app-cache").then((cache) => {
-      return cache.addAll([
-        "/",
-        "/index.html",
-        "/style.css",
-        "/manifest.json",
-        "/assets/logo.png",
-        "/js/app.js",
-        "/js/firebaseConfig.js",
-        "/js/cloudinary.js"
-      ]);
-    })
-  );
+// service-worker.js
+self.addEventListener("install", (event) => {
+  console.log("🛠️ Service Worker installed");
 });
 
-self.addEventListener("fetch", (e) => {
-  e.respondWith(
-    caches.match(e.request).then((response) => {
-      return response || fetch(e.request);
-    }).catch(() => {
-      // Optional fallback for offline
-      if (e.request.destination === "document") return caches.match("/index.html");
-    })
-  );
+self.addEventListener("activate", (event) => {
+  console.log("🚀 Service Worker activated");
 });
