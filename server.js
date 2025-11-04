@@ -1,5 +1,5 @@
 // ===============================
-// server.js — Filestack Integrated Upload Backend (Final Fixed)
+// server.js — Filestack Integrated Upload Backend (Final Matched)
 // ===============================
 
 import express from "express";
@@ -21,27 +21,28 @@ app.use(express.json({ limit: "50mb" }));
 app.use(express.urlencoded({ extended: true, limit: "50mb" }));
 
 // ======== Filestack Configuration ========
-const FILESTACK_API_KEY = process.env.FILESTACK_API_KEY || "A54XqHKu1TjCtCl3rTWhpz";
+const FILESTACK_API_KEY =
+  process.env.FILESTACK_API_KEY || "A54XqHKu1TjCtCl3rTWhpz";
 const FILESTACK_UPLOAD_URL = `https://www.filestackapi.com/api/store/S3?key=${FILESTACK_API_KEY}`;
 
 // =================================================
-// ROUTE: Upload File (Image or Document)
+// ROUTE: Upload File
 // =================================================
-app.post("/upload-cloudinary", upload.single("files"), async (req, res) => {
+app.post("/upload-cloudinary", upload.single("file"), async (req, res) => {
   try {
-    // ✅ handle missing file safely
     if (!req.file) {
-      console.error("❌ No file received by backend!");
+      console.error("❌ No file received!");
       return res.status(400).json({ error: "No file uploaded" });
     }
 
     const file = req.file;
+    console.log("✅ File received:", file.originalname);
 
     const form = new FormData();
     const fileStream = fs.createReadStream(file.path);
     form.append("fileUpload", fileStream, {
-      filename: file.originalname || path.basename(file.path),
-      contentType: file.mimetype || "application/octet-stream",
+      filename: file.originalname,
+      contentType: file.mimetype,
     });
 
     const headers = form.getHeaders();
@@ -52,12 +53,10 @@ app.post("/upload-cloudinary", upload.single("files"), async (req, res) => {
       maxBodyLength: Infinity,
     });
 
-    // 🧹 delete temp file after upload
-    try {
-      fs.unlinkSync(file.path);
-    } catch (err) {
-      console.warn("⚠️ Failed to delete temp file:", file.path);
-    }
+    // 🧹 Clean temp file
+    fs.unlink(file.path, (err) => {
+      if (err) console.warn("⚠️ Failed to delete temp file:", err);
+    });
 
     const data = response.data || {};
     const secure_url =
@@ -67,27 +66,19 @@ app.post("/upload-cloudinary", upload.single("files"), async (req, res) => {
 
     if (!secure_url) {
       console.error("❌ Filestack returned no URL:", data);
-      return res.status(500).json({ error: "Filestack returned no URL", raw: data });
+      return res.status(500).json({ error: "No URL from Filestack", data });
     }
 
     console.log("✅ Uploaded to Filestack:", secure_url);
-
-    // ✅ send consistent array like frontend expects
-    return res.json([
-      {
-        secure_url,
-        public_id,
-        resource_type,
-      },
-    ]);
+    return res.json([{ secure_url, public_id, resource_type }]);
   } catch (err) {
-    console.error("❌ Upload to Filestack error:", err.response?.data || err.message);
+    console.error("❌ Upload error:", err.response?.data || err.message);
     return res.status(500).json({ error: "Upload failed", details: err.message });
   }
 });
 
 // =================================================
-// ROUTE: Delete File from Filestack
+// DELETE File Route
 // =================================================
 app.delete("/delete-cloudinary/:publicId", async (req, res) => {
   try {
@@ -101,20 +92,16 @@ app.delete("/delete-cloudinary/:publicId", async (req, res) => {
     const response = await axios.delete(deleteUrl);
 
     if (response.status === 200) {
-      console.log("🗑️ Deleted file:", publicId);
+      console.log("🗑️ Deleted:", publicId);
       return res.json({ success: true });
-    } else {
-      console.warn("⚠️ Filestack delete returned non-200:", response.status);
-      return res.status(500).json({ error: "Failed to delete file" });
     }
+
+    return res.status(500).json({ error: "Failed to delete file" });
   } catch (err) {
     console.error("❌ Delete error:", err.response?.data || err.message);
-    return res.status(500).json({ error: "Failed to delete file", details: err.message });
+    return res.status(500).json({ error: "Delete failed", details: err.message });
   }
 });
 
-// =================================================
-// START SERVER
-// =================================================
 const PORT = process.env.PORT || 5000;
-app.listen(PORT, () => console.log(`✅ Server running on http://localhost:${PORT}`));
+app.listen(PORT, () => console.log(`✅ Server running at http://localhost:${PORT}`));
