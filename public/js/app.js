@@ -6,7 +6,7 @@ import {
   onAuthStateChanged,
   createUserWithEmailAndPassword,
   signInWithEmailAndPassword,
-  signOut
+  signOut,
 } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
 import {
   getFirestore,
@@ -18,10 +18,10 @@ import {
   doc,
   getDoc,
   deleteDoc,
-  serverTimestamp
+  serverTimestamp,
 } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
 
-import { uploadToCloudinary, deleteFromCloudinary } from "./cloudinary.js";
+import { uploadToFilestack, deleteFromFilestack } from "./filestack.js"; // ✅ updated import
 
 // Global Firebase instances
 let db;
@@ -38,7 +38,8 @@ function displayMessage(message, type = "info") {
   if (!box) {
     box = document.createElement("div");
     box.id = "platform-message-box";
-    box.className = "fixed top-4 right-4 z-50 p-4 rounded-xl shadow-2xl text-white font-semibold transition-opacity duration-300 opacity-0";
+    box.className =
+      "fixed top-4 right-4 z-50 p-4 rounded-xl shadow-2xl text-white font-semibold transition-opacity duration-300 opacity-0";
     document.body.appendChild(box);
   }
 
@@ -57,7 +58,7 @@ function displayMessage(message, type = "info") {
 }
 
 function showScreen(id) {
-  document.querySelectorAll("section").forEach(sec => {
+  document.querySelectorAll("section").forEach((sec) => {
     sec.classList.add("hidden");
     sec.classList.remove("flex");
   });
@@ -69,7 +70,6 @@ function showScreen(id) {
 }
 
 // --- Firebase Logic Functions ---
-
 async function handleDeleteListing(id, btn) {
   if (!auth.currentUser) return;
 
@@ -85,8 +85,8 @@ async function handleDeleteListing(id, btn) {
     const land = docSnap.data();
     const publicIds = [...(land.imagePublicIds || []), ...(land.docPublicIds || [])];
 
-    const deletePromises = publicIds.map(publicId =>
-      deleteFromCloudinary(publicId).catch(err => {
+    const deletePromises = publicIds.map((publicId) =>
+      deleteFromFilestack(publicId).catch((err) => {
         console.error(`Failed to delete asset ID ${publicId}:`, err);
         return null;
       })
@@ -108,7 +108,8 @@ async function handleDeleteListing(id, btn) {
 
 async function loadSellerUploads() {
   if (!auth.currentUser) {
-    document.getElementById("seller-previous-uploads").innerHTML = "<p class='text-red-500'>Error: Not authenticated to view uploads.</p>";
+    document.getElementById("seller-previous-uploads").innerHTML =
+      "<p class='text-red-500'>Error: Not authenticated to view uploads.</p>";
     return;
   }
 
@@ -138,7 +139,9 @@ async function loadSellerUploads() {
       const listingHtml = `
         <div id="listing-${land.id}" class="p-4 bg-gray-50 border rounded-xl shadow-md text-left transition-all hover:shadow-lg">
           <div class="grid grid-cols-2 gap-2 mb-2">
-            ${(land.imageUrls || []).map(url => `<img src="${url}" class="w-full h-24 object-cover rounded" alt="Land Image"/>`).join("")}
+            ${(land.imageUrls || [])
+              .map((url) => `<img src="${url}" class="w-full h-24 object-cover rounded" alt="Land Image"/>`)
+              .join("")}
           </div>
           <h3 class="font-bold text-lg text-green-700">${land.location} - ${land.size} acres</h3>
           <p class="text-gray-700">Price: ₹${land.price} | Soil: ${land.soilType}</p>
@@ -150,7 +153,7 @@ async function loadSellerUploads() {
       uploadsDiv.insertAdjacentHTML("beforeend", listingHtml);
     });
 
-    document.querySelectorAll(".delete-btn").forEach(btn => {
+    document.querySelectorAll(".delete-btn").forEach((btn) => {
       btn.addEventListener("click", async () => {
         const id = btn.dataset.id;
         await handleDeleteListing(id, btn);
@@ -163,7 +166,7 @@ async function loadSellerUploads() {
   }
 }
 
-// ✅ FIXED FUNCTION (major update)
+// ✅ Filestack Upload Integration
 async function handleLandUpload(e) {
   e.preventDefault();
 
@@ -192,7 +195,7 @@ async function handleLandUpload(e) {
     displayMessage("Uploading files to Filestack...", "info");
 
     const uploadFile = async (file) => {
-      const res = await uploadToCloudinary(file);
+      const res = await uploadToFilestack(file);
       if (!res || !res.secure_url) throw new Error("Upload failed: no URL returned");
       return res;
     };
@@ -218,7 +221,7 @@ async function handleLandUpload(e) {
       docUrls,
       imagePublicIds,
       docPublicIds,
-      createdAt: serverTimestamp()
+      createdAt: serverTimestamp(),
     };
 
     const landCollectionRef = collection(db, LANDS_COLLECTION_PATH());
@@ -268,15 +271,17 @@ async function searchLand(e) {
 
     resultsDiv.innerHTML = "";
     filteredResults.forEach((land) => {
-      let imagesHTML = (land.imageUrls && land.imageUrls.length > 0)
-        ? land.imageUrls.map(url => `<img src="${url}" class="w-full h-40 object-cover rounded mb-2" alt="Land Image"/>`).join("")
-        : '<div class="text-gray-400 h-40 flex items-center justify-center bg-gray-100 rounded">No Images Available</div>';
+      let imagesHTML =
+        land.imageUrls?.length > 0
+          ? land.imageUrls.map((url) => `<img src="${url}" class="w-full h-40 object-cover rounded mb-2" alt="Land Image"/>`).join("")
+          : '<div class="text-gray-400 h-40 flex items-center justify-center bg-gray-100 rounded">No Images Available</div>';
 
-      let docsHTML = land.docUrls && land.docUrls.length > 0
-        ? `<div class="mt-2"><h4 class="font-semibold text-green-700">Documents:</h4><ul class="list-disc ml-6">
-         ${land.docUrls.map(url => `<li><a href="${url}" target="_blank" class="text-blue-600 hover:text-blue-800 underline">View Document</a></li>`).join("")}
-         </ul></div>`
-        : "";
+      let docsHTML =
+        land.docUrls?.length > 0
+          ? `<div class="mt-2"><h4 class="font-semibold text-green-700">Documents:</h4><ul class="list-disc ml-6">
+             ${land.docUrls.map((url) => `<li><a href="${url}" target="_blank" class="text-blue-600 hover:text-blue-800 underline">View Document</a></li>`).join("")}
+             </ul></div>`
+          : "";
 
       resultsDiv.innerHTML += `
         <div class="p-6 bg-gray-50 border border-green-200 rounded-xl shadow-lg text-left">
@@ -326,7 +331,7 @@ document.addEventListener("DOMContentLoaded", () => {
     else showScreen("welcome-screen");
   });
 
-  // Buttons and forms
+  // Buttons & forms
   document.getElementById("btn-login").addEventListener("click", () => {
     showScreen("auth-screen");
     document.getElementById("auth-title").textContent = "Login";
@@ -346,7 +351,9 @@ document.addEventListener("DOMContentLoaded", () => {
   document.getElementById("auth-toggle-btn").addEventListener("click", () => {
     isLogin = !isLogin;
     document.getElementById("auth-title").textContent = isLogin ? "Login" : "Register";
-    document.getElementById("auth-toggle-text").textContent = isLogin ? "Don’t have an account?" : "Already have an account?";
+    document.getElementById("auth-toggle-text").textContent = isLogin
+      ? "Don’t have an account?"
+      : "Already have an account?";
     document.getElementById("auth-toggle-btn").textContent = isLogin ? "Register here" : "Login here";
   });
 

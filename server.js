@@ -1,5 +1,5 @@
 // ===============================
-// server.js — Filestack Integrated Upload Backend (Final Matched)
+// server.js — Final Filestack Integration (Matched with filestack.js)
 // ===============================
 
 import express from "express";
@@ -26,9 +26,9 @@ const FILESTACK_API_KEY =
 const FILESTACK_UPLOAD_URL = `https://www.filestackapi.com/api/store/S3?key=${FILESTACK_API_KEY}`;
 
 // =================================================
-// ROUTE: Upload File
+// ✅ ROUTE: Upload File (Frontend → /upload-filestack)
 // =================================================
-app.post("/upload-cloudinary", upload.single("file"), async (req, res) => {
+app.post("/upload-filestack", upload.single("file"), async (req, res) => {
   try {
     if (!req.file) {
       console.error("❌ No file received!");
@@ -78,9 +78,9 @@ app.post("/upload-cloudinary", upload.single("file"), async (req, res) => {
 });
 
 // =================================================
-// DELETE File Route
+// ✅ ROUTE: Delete File (Frontend → /delete-filestack/:publicId)
 // =================================================
-app.delete("/delete-cloudinary/:publicId", async (req, res) => {
+app.delete("/delete-filestack/:publicId", async (req, res) => {
   try {
     const { publicId } = req.params;
     if (!publicId) return res.status(400).json({ error: "Missing publicId" });
@@ -103,5 +103,8 @@ app.delete("/delete-cloudinary/:publicId", async (req, res) => {
   }
 });
 
+// =================================================
+// Server Listener
+// =================================================
 const PORT = process.env.PORT || 5000;
 app.listen(PORT, () => console.log(`✅ Server running at http://localhost:${PORT}`));
