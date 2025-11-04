@@ -1,5 +1,5 @@
 // ===============================
-// server.js — Final Filestack Integration (Render + Frontend Hosting)
+// server.js — Final Filestack Integration (Render Compatible)
 // ===============================
 
 import express from "express";
@@ -10,7 +10,7 @@ import axios from "axios";
 import FormData from "form-data";
 import path from "path";
 import dotenv from "dotenv";
-import { fileURLToPath } from "url"; // ✅ add this (for static path)
+import { fileURLToPath } from "url";
 
 dotenv.config();
 
@@ -54,7 +54,7 @@ app.post("/upload-filestack", upload.single("file"), async (req, res) => {
       maxBodyLength: Infinity,
     });
 
-    // 🧹 Clean up temp file
+    // 🧹 Delete temp file
     fs.unlink(file.path, (err) => {
       if (err) console.warn("⚠️ Failed to delete temp file:", err);
     });
@@ -108,23 +108,23 @@ app.delete("/delete-filestack/:publicId", async (req, res) => {
 });
 
 // =================================================
-// ✅ Serve Frontend (Fix for Render 404)
+// ✅ STATIC FRONTEND HOSTING (for Render)
 // =================================================
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
-// Serve static files from "public" folder
+// Serve all files from "public" folder
 app.use(express.static(path.join(__dirname, "public")));
 
-// Always return index.html for any unknown route
+// Always return index.html for all other routes
 app.get("*", (req, res) => {
   res.sendFile(path.join(__dirname, "public", "index.html"));
 });
 
 // =================================================
-// ✅ Server Listener
+// ✅ START SERVER
 // =================================================
 const PORT = process.env.PORT || 5000;
 app.listen(PORT, () =>
-  console.log(`✅ Server running and serving frontend at port ${PORT}`)
+  console.log(`✅ Server running and serving frontend on port ${PORT}`)
 );
