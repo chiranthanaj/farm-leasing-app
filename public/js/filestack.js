@@ -33,9 +33,12 @@ export async function uploadToFilestack(file) {
     console.log("📦 Upload response:", data);
 
     // ✅ Validate response format
-    if (!data || !Array.isArray(data) || !data[0]?.secure_url) {
+    if (!data?.url) {
       throw new Error("Invalid upload response from backend");
     }
+
+return data.url;
+
 
     const { secure_url, public_id, resource_type } = data[0];
     return { secure_url, public_id, resource_type };

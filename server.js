@@ -22,8 +22,7 @@ app.use(express.json({ limit: "50mb" }));
 app.use(express.urlencoded({ extended: true, limit: "50mb" }));
 
 // ======== Filestack Configuration ========
-const FILESTACK_API_KEY =
-  process.env.FILESTACK_API_KEY || "AnJv4oRHCQQso69tVQnIzz";
+const FILESTACK_API_KEY = process.env.FILESTACK_API_KEY;
 const FILESTACK_UPLOAD_URL = `https://www.filestackapi.com/api/store/S3?key=${FILESTACK_API_KEY}`;
 
 // =================================================
