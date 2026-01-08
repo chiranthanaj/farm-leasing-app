@@ -1,7 +1,8 @@
 // ===============================
-// filestack.js (Final Synced Version)
+// filestack.js — Final Working Version
 // ===============================
 
+// Backend URL (local vs Render)
 const BACKEND_URL =
   window.location.hostname === "localhost"
     ? "http://localhost:5000"
@@ -14,11 +15,13 @@ export async function uploadToFilestack(file) {
   if (!file) throw new Error("No file provided for upload");
 
   try {
-    console.log("📤 Uploading file to backend (Filestack) endpoint...");
+    console.log("📤 Uploading file to backend (Filestack)...");
 
+    // Prepare form data (backend expects key: 'file')
     const formData = new FormData();
-    formData.append("file", file); // ✅ backend expects this key
+    formData.append("file", file);
 
+    // Send file to backend
     const res = await fetch(`${BACKEND_URL}/upload-filestack`, {
       method: "POST",
       body: formData,
@@ -30,18 +33,20 @@ export async function uploadToFilestack(file) {
     }
 
     const data = await res.json();
-    console.log("📦 Upload response:", data);
+    console.log("📦 Backend upload response:", data);
 
-    // ✅ Validate response format
-    if (!data?.url) {
+    // ✅ Backend returns: [{ secure_url, public_id, resource_type }]
+    if (!Array.isArray(data) || !data[0]?.secure_url) {
       throw new Error("Invalid upload response from backend");
     }
 
-return data.url;
-
-
     const { secure_url, public_id, resource_type } = data[0];
-    return { secure_url, public_id, resource_type };
+
+    return {
+      secure_url,
+      public_id,
+      resource_type,
+    };
   } catch (err) {
     console.error("❌ Upload error:", err);
     throw err;
@@ -56,21 +61,23 @@ export async function deleteFromFilestack(publicId, resourceType = "auto") {
 
   try {
     const res = await fetch(
-      `${BACKEND_URL}/delete-filestack/${encodeURIComponent(
-        publicId
-      )}?resource_type=${encodeURIComponent(resourceType)}`,
+      `${BACKEND_URL}/delete-filestack/${encodeURIComponent(publicId)}?resource_type=${encodeURIComponent(
+        resourceType
+      )}`,
       { method: "DELETE" }
     );
 
     const data = await res.json();
+
     if (!res.ok || !data.success) {
       throw new Error("Delete failed: " + JSON.stringify(data));
     }
 
-    console.log(`✅ Successfully deleted ${publicId} from Filestack`);
+    console.log(`🗑️ Successfully deleted from Filestack: ${publicId}`);
     return true;
   } catch (err) {
     console.error("❌ Delete error:", err);
     throw err;
   }
 }
+s
