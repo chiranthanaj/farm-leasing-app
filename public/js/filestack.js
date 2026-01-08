@@ -1,5 +1,5 @@
 // ===============================
-// filestack.js — Final Working Version
+// filestack.js — CLEAN FINAL VERSION
 // ===============================
 
 // Backend URL (local vs Render)
@@ -17,11 +17,9 @@ export async function uploadToFilestack(file) {
   try {
     console.log("📤 Uploading file to backend (Filestack)...");
 
-    // Prepare form data (backend expects key: 'file')
     const formData = new FormData();
     formData.append("file", file);
 
-    // Send file to backend
     const res = await fetch(`${BACKEND_URL}/upload-filestack`, {
       method: "POST",
       body: formData,
@@ -35,18 +33,13 @@ export async function uploadToFilestack(file) {
     const data = await res.json();
     console.log("📦 Backend upload response:", data);
 
-    // ✅ Backend returns: [{ secure_url, public_id, resource_type }]
     if (!Array.isArray(data) || !data[0]?.secure_url) {
       throw new Error("Invalid upload response from backend");
     }
 
     const { secure_url, public_id, resource_type } = data[0];
 
-    return {
-      secure_url,
-      public_id,
-      resource_type,
-    };
+    return { secure_url, public_id, resource_type };
   } catch (err) {
     console.error("❌ Upload error:", err);
     throw err;
@@ -80,4 +73,3 @@ export async function deleteFromFilestack(publicId, resourceType = "auto") {
     throw err;
   }
 }
-s
